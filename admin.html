@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Clean-Nest • Admin</title>
+<meta content="Clean-Nest customer portal" name="description"/>
+<link href="style.css" rel="stylesheet"/>
+</head>
+<body class="portal-page">
+<header class="header">
+<div class="wrap header-inner">
+<a class="brand" href="index.html">
+<div aria-hidden="true" class="logo">
+<svg fill="none" height="22" viewbox="0 0 24 24" width="22">
+<path d="M4 11.5L12 5l8 6.5" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<path d="M7.5 10.8V20h9V10.8" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<path d="M11 20v-6h2v6" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div class="brand-title">
+<strong>Clean-Nest</strong>
+<span>PORTAL</span>
+</div>
+</a>
+<div class="cta">
+<div class="theme-toggle" data-theme-ui="">
+<button aria-expanded="false" aria-haspopup="menu" class="btn" data-theme-button="" title="Theme" type="button">🌗 Theme</button>
+<div class="theme-menu" hidden="" role="menu">
+<button aria-checked="false" class="theme-opt" data-theme-set="system" role="menuitemradio" type="button">System</button>
+<button aria-checked="false" class="theme-opt" data-theme-set="light" role="menuitemradio" type="button">Light</button>
+<button aria-checked="false" class="theme-opt" data-theme-set="dark" role="menuitemradio" type="button">Dark</button>
+</div>
+</div>
+<button class="btn" id="portalBackBtn" style="display:none;" type="button">← Back</button>
+<button class="btn btn-danger" id="logoutBtn" type="button">Logout</button>
+</div>
+</div>
+</header>
+<main>
+<section class="portal" style="display:block;">
+<div class="wrap">
+<div class="portal-top">
+<div>
+<h2 class="section-title" style="margin:0;">Customer Portal</h2>
+<p class="section-sub" style="margin:6px 0 0;">Reference targets, checklists and photo updates.</p>
+</div>
+<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+<span class="tag" id="roleTag">ROLE</span>
+<span class="tag" id="userTag">USER</span>
+</div>
+</div>
+<!-- ADMIN -->
+<div class="portal-grid-1" id="portalAdmin" style="display:grid;">
+<div class="portal-admin-bar">
+<button class="btn" id="adminToolsBtn" type="button">⚙️ Admin tools</button>
+<span class="small-note">Add/remove clients &amp; staff (opens on demand)</span>
+</div>
+<!-- No outer card here: cards are reserved for client + property cards -->
+<!-- Admin tabs -->
+<div class="admin-tabs" id="adminTabs">
+<button class="tab-btn is-active" data-action="admin-tab" data-tab="properties" type="button">🏠 Properties</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="timeline" type="button">🗓️ Timeline</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="schedule" type="button">📅 Schedule</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="activities" type="button">📝 Activities</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="invoices" type="button">🧾 Invoices</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="modules" type="button">🧩 Modules</button>
+</div>
+<div id="adminTabProperties">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Clients &amp; properties</h3>
+<p class="section-sub" style="margin:6px 0 0;">
+                  Search → select a property → schedule/edit/session.
+                </p>
+</div>
+</div>
+<!-- Search / filter bar (full-width) -->
+<div class="admin-props-toolbar" id="adminControls">
+<input class="input admin-search" id="adminSearch" placeholder="Search owner, phone, address, notes…"/>
+<label class="chip-check" title="Show only properties with an active session">
+<input id="filterActiveSession" type="checkbox"/>
+<span>Active session</span>
+</label>
+<label class="chip-check" title="Active session OR no staff assigned OR last cleaned older than 14 days">
+<input id="filterNeedsAttention" type="checkbox"/>
+<span>Needs attention</span>
+</label>
+<select aria-label="Sort" class="input admin-sort" id="adminSort">
+<option value="due">Sort: Due (oldest cleaned)</option>
+<option value="recent">Sort: Recent (newest cleaned)</option>
+<option value="az">Sort: A–Z</option>
+</select>
+</div>
+<!-- Two-column explorer -->
+<div class="admin-explorer" id="adminExplorer">
+<div aria-label="Clients and properties" class="admin-explorer__left">
+<div class="admin-client-list" id="adminClientsList"></div>
+</div>
+<div aria-label="Property details" class="admin-explorer__right" id="adminPropDetail"></div>
+</div>
+</div>
+<!-- TIMELINE (Admin planning view) -->
+<div id="adminTabTimeline" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Timeline</h3>
+<p class="section-sub" style="margin:6px 0 0;">Plan upcoming cleanings. Scroll the next 30 days. Click a day to add a booking.</p>
+</div>
+<div class="timeline-head-controls">
+<span class="tag" id="timelineMonthLabel">Current month</span>
+<div aria-label="Range" class="seg-toggle" id="timelineRangeToggle">
+<button class="seg-btn is-active" data-range="1" type="button">Today</button>
+<button class="seg-btn" data-range="7" type="button">Next 7</button>
+<button class="seg-btn" data-range="30" type="button">Next 30</button>
+</div>
+<div aria-label="Heatmap metric" class="seg-toggle" id="timelineMetricToggle">
+<button class="seg-btn is-active" data-metric="jobs" type="button">Jobs</button>
+<button class="seg-btn" data-metric="hours" type="button">Hours</button>
+</div>
+<label class="chip-check" title="Show only bookings with no staff assigned">
+<input id="timelineUnassignedOnly" type="checkbox"/>
+<span>Unassigned</span>
+</label>
+<button class="btn" id="timelineExportCsv" type="button">⬇️ CSV</button>
+<button class="btn" id="timelinePrint" type="button">🖨️ Print</button>
+<button class="btn" id="timelineJumpToday" type="button">Today</button>
+</div>
+</div>
+<div aria-label="Month overview" class="timeline-heatmap" id="timelineHeatmap"></div>
+<div aria-label="Next 30 days" class="timeline-days" id="timelineDays"></div>
+<!-- Add booking modal -->
+<div class="cn-modal" hidden="" id="timelineAddModal">
+<div class="cn-modal__overlay" data-action="timeline-add-cancel"></div>
+<div aria-label="Add booking" aria-modal="true" class="cn-modal__panel" role="dialog">
+<div class="cn-modal__head">
+<div>
+<strong id="timelineAddTitle">Add booking</strong>
+<div class="small-note" id="timelineAddHint">—</div>
+</div>
+<button class="btn" data-action="timeline-add-cancel" type="button">Close</button>
+</div>
+<div class="form" style="margin-top:10px;">
+<div>
+<div class="label">Property</div>
+<input class="input" id="timelineAddSearch" placeholder="Search owner, phone, address…"/>
+<div class="timeline-prop-results" id="timelineAddResults"></div>
+<div class="small-note" id="timelineAddSelected" style="margin-top:8px; display:none;"></div>
+</div>
+<div class="row-2" style="margin-top:12px;">
+<div>
+<div class="label">Start time</div>
+<input class="input" id="timelineAddTime" type="time" value="09:00"/>
+</div>
+<div>
+<div class="label">Duration</div>
+<select class="input" id="timelineAddDuration">
+<option value="60">1h</option>
+<option value="90">1h 30m</option>
+<option selected="" value="120">2h</option>
+<option value="180">3h</option>
+<option value="240">4h</option>
+</select>
+</div>
+</div>
+<div style="margin-top:10px;">
+<label class="chip-check">
+<input id="timelineAddTbd" type="checkbox"/>
+<span>Time TBD (save without time)</span>
+</label>
+</div>
+<div style="margin-top:12px;">
+<div class="label">Notes (optional)</div>
+<textarea class="input" id="timelineAddNotes" placeholder="Access notes, changes, special request…" rows="3"></textarea>
+</div>
+<div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+<button class="btn" data-action="timeline-add-cancel" type="button">Cancel</button>
+<button class="btn btn-primary" id="timelineAddSave" type="button">Create booking</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="adminTabSchedule" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Schedule</h3>
+<p class="section-sub" style="margin:6px 0 0;">All planned cleanings. Create from a property card (📅 Schedule).</p>
+<div class="schedule-controls" id="scheduleControls">
+<input aria-label="Month" class="input" id="scheduleMonth" type="month"/>
+<select aria-label="Status" class="input" id="scheduleStatus">
+<option value="all">Status: All</option>
+<option value="scheduled">Scheduled</option>
+<option value="in_progress">In progress</option>
+<option value="completed">Completed</option>
+<option value="cancelled">Cancelled</option>
+</select>
+<select aria-label="Staff" class="input" id="scheduleStaff">
+<option value="">Staff: All</option>
+</select>
+<label class="chip-check" title="Show only bookings with no staff assigned">
+<input id="scheduleUnassignedOnly" type="checkbox"/>
+<span>Unassigned</span>
+</label>
+<button class="btn" id="scheduleResetFilters" type="button">Reset</button>
+<button class="btn" id="scheduleExportCsv" type="button">⬇️ CSV</button>
+<button class="btn" id="schedulePrint" type="button">🖨️ Print</button>
+</div>
+</div>
+</div>
+<div id="scheduleList"></div>
+</div>
+<div id="adminTabInvoices" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Monthly invoices</h3>
+<p class="section-sub" style="margin:6px 0 0;">Select a month → view counts &amp; totals per property. Export CSV for invoicing.</p>
+<div class="invoice-controls" id="invoiceControls">
+<input aria-label="Invoice month" class="input" id="invoiceMonth" type="month"/>
+<select aria-label="Invoice client" class="input" id="invoiceClient">
+<option value="">Client: All</option>
+</select>
+<button class="btn" id="invoiceDownloadCsv" type="button">⬇️ Download CSV</button>
+</div>
+<div class="invoice-status" id="invoiceStatusBar" style="display:none; margin-top:10px;">
+<div class="invoice-status__main" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start; justify-content:space-between;">
+<div style="flex:1; min-width:280px;">
+<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+<span class="badge draft" id="invoiceStateBadge">draft</span>
+<span class="small-note" id="invoiceStatusText">—</span>
+<span class="small-note" id="invoiceSavedHint" style="display:none;">Saved ✓</span>
+</div>
+<div class="row-2" style="margin-top:10px;">
+<input class="input" id="invoiceSentTo" placeholder="Sent to email (optional)"/>
+<select aria-label="Payment method" class="input" id="invoicePaymentMethod">
+<option value="bank">Payment: Bank transfer</option>
+<option value="cash">Payment: Cash</option>
+<option value="card">Payment: Card</option>
+<option value="other">Payment: Other</option>
+</select>
+</div>
+<div class="row-2" style="margin-top:10px;">
+<input class="input" id="invoicePaymentLink" placeholder="Payment link (optional – future card payments)"/>
+<input class="input" id="invoicePaymentRef" placeholder="Payment reference (optional)"/>
+</div>
+<textarea class="input" id="invoiceInvoiceNote" placeholder="Invoice note (optional – appears in email)" rows="2" style="margin-top:10px; width:100%;"></textarea>
+<details style="margin-top:10px;">
+<summary class="small-note" style="cursor:pointer;">Bank details (used in invoice email)</summary>
+<textarea class="input" id="invoiceBillingText" placeholder="Example:
+Account holder: ...
+IBAN: ...
+Bank: ...
+SWIFT/BIC: ...
+Currency: EUR" rows="4" style="margin-top:10px; width:100%;"></textarea>
+</details>
+</div>
+<div id="invoiceStatusActions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start; justify-content:flex-end;">
+<button class="btn btn-primary" id="invoiceNextStatus" type="button">Set as Sent</button>
+<button class="btn" id="invoiceUndoStatus" type="button">Undo</button>
+<button class="btn" id="invoiceSendEmail" type="button">✉️ Send email</button>
+<button class="btn btn-danger" id="invoiceClearStatus" type="button">Reset</button>
+</div>
+</div>
+</div>
+</div>
+<div id="invoiceReport"></div>
+</div>
+<!-- ACTIVITIES -->
+<div id="adminTabActivities" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Activities</h3>
+<p class="section-sub" style="margin:6px 0 0;">
+                  Create your own activity types (e.g. “Take out trash”, “Call technician”) and schedule them on the calendar.
+                </p>
+<div class="schedule-controls" style="margin-top:10px; justify-content:flex-start; flex-wrap:wrap;">
+<input aria-label="Activities month" class="input" id="activitiesMonth" type="month"/>
+<button class="btn btn-primary" id="activityNewBtn" type="button">＋ New activity</button>
+<button class="btn" id="activityTypeNewBtn" type="button">＋ New activity type</button>
+</div>
+</div>
+</div>
+<div id="activitiesPanel"></div>
+<!-- Activity type modal -->
+<div class="cn-modal" hidden="" id="activityTypeModal">
+<div class="cn-modal__overlay" data-action="activitytype-cancel"></div>
+<div aria-label="New activity type" aria-modal="true" class="cn-modal__panel" role="dialog">
+<div class="cn-modal__head">
+<div>
+<strong>Create activity type</strong>
+<div class="small-note">Reusable template</div>
+</div>
+<button class="btn" data-action="activitytype-cancel" type="button">Close</button>
+</div>
+<div class="form" style="margin-top:10px;">
+<div class="row-2">
+<input class="input" id="activityTypeName" placeholder="Name (e.g. Take out trash)"/>
+<select aria-label="Default duration" class="input" id="activityTypeDefaultDuration">
+<option value="15">15 min</option>
+<option selected="" value="30">30 min</option>
+<option value="45">45 min</option>
+<option value="60">60 min</option>
+<option value="90">90 min</option>
+<option value="120">120 min</option>
+</select>
+</div>
+<div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+<button class="btn" data-action="activitytype-cancel" type="button">Cancel</button>
+<button class="btn btn-primary" id="activityTypeSave" type="button">Save</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Activity modal -->
+<div class="cn-modal" hidden="" id="activityModal">
+<div class="cn-modal__overlay" data-action="activity-cancel"></div>
+<div aria-label="New activity" aria-modal="true" class="cn-modal__panel" role="dialog">
+<div class="cn-modal__head">
+<div>
+<strong id="activityModalTitle">New activity</strong>
+<div class="small-note" id="activityModalHint">Schedule something custom</div>
+</div>
+<button class="btn" data-action="activity-cancel" type="button">Close</button>
+</div>
+<div class="form" style="margin-top:10px;">
+<div>
+<div class="label">Activity type</div>
+<select class="input" id="activityTypeSelect"></select>
+<div class="small-note" style="margin-top:6px;">Tip: Use “Custom…” to type anything.</div>
+<input class="input" id="activityCustomName" placeholder="Custom name (only for Custom…)" style="margin-top:10px; display:none;"/>
+</div>
+<div class="row-2" style="margin-top:12px;">
+<div>
+<div class="label">Date</div>
+<input class="input" id="activityDate" type="date"/>
+</div>
+<div>
+<div class="label">Start time</div>
+<input class="input" id="activityTimeFrom" type="time" value="09:00"/>
+</div>
+</div>
+<div class="row-2" style="margin-top:12px;">
+<div>
+<div class="label">Duration</div>
+<select class="input" id="activityDuration">
+<option value="15">15 min</option>
+<option selected="" value="30">30 min</option>
+<option value="45">45 min</option>
+<option value="60">60 min</option>
+<option value="90">90 min</option>
+<option value="120">120 min</option>
+</select>
+</div>
+<div>
+<div class="label">Assign staff (optional)</div>
+<select class="input" id="activityStaff"></select>
+</div>
+</div>
+<div style="margin-top:12px;">
+<div class="label">Property (optional)</div>
+<select class="input" id="activityProperty"></select>
+</div>
+<div style="margin-top:12px;">
+<div class="label">Notes (optional)</div>
+<textarea class="input" id="activityNotes" placeholder="Any extra details…" rows="3"></textarea>
+</div>
+<div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+<button class="btn" data-action="activity-cancel" type="button">Cancel</button>
+<button class="btn btn-primary" id="activitySave" type="button">Save</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- MODULES -->
+<div id="adminTabModules" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Modules</h3>
+<p class="section-sub" style="margin:6px 0 0;">
+                  Choose which workspace tabs are visible for this tenant. Everything stays available in the background and can be enabled later.
+                </p>
+</div>
+</div>
+<div class="card">
+<div class="card-h">Workspace tabs</div>
+<div class="card-b">
+<div id="modulesList"></div>
+<p class="small-note" style="margin:10px 0 0;">Tip: Modules only affect visibility. Security must be enforced server-side when you add paid plans.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- ADMIN TOOLS DRAWER (hidden until opened) -->
+<div aria-hidden="true" class="drawer" id="adminToolsDrawer">
+<div class="drawer__overlay" data-action="close-admin-tools" tabindex="-1"></div>
+<div aria-label="Admin tools" aria-modal="true" class="drawer__panel card" role="dialog">
+<div class="drawer__head">
+<div style="display:flex; flex-direction:column; gap:2px;">
+<strong>Admin tools</strong>
+<span class="small-note">Less-used actions: manage users</span>
+</div>
+<button class="btn" data-action="close-admin-tools" type="button">Close</button>
+</div>
+<h3 style="margin:0 0 10px;">Add client</h3>
+<div class="form">
+<div>
+<div class="label">Client details</div>
+<div class="row-2">
+<input class="input" id="addClientName" placeholder="Client name (required)"/>
+<input class="input" id="addClientPhone" placeholder="Phone (optional)"/>
+</div>
+<div style="height:10px"></div>
+<div class="row-2">
+<input class="input" id="addClientEmail" placeholder="Email (required)" type="email"/>
+<input class="input" id="addClientPassword" placeholder="Password (required)" type="text"/>
+</div>
+<div style="height:10px"></div>
+<button class="btn btn-primary" id="addClientBtn" style="justify-content:center;" type="button">
+                  + Add client
+                </button>
+<div aria-live="polite" class="alert ok" id="adminAlert" role="status"></div>
+</div>
+</div>
+<div class="divider"></div>
+<h3 style="margin:0 0 10px;">Remove client</h3>
+<p class="small-note" style="margin:0 0 10px;">This will delete all properties and photos for that client.</p>
+<div class="form">
+<div>
+<div class="label">Select client</div>
+<select class="input" id="removeClientSelect">
+<option value="">— Select a client —</option>
+</select>
+<div style="height:10px"></div>
+<button class="btn btn-danger" id="removeClientBtn" style="justify-content:center;" type="button">
+                  🗑️ Remove client
+                </button>
+</div>
+</div>
+<div class="divider"></div>
+<h3 style="margin:0 0 10px;">Add staff</h3>
+<p class="section-sub" style="margin:0 0 12px;">
+              Staff sees only assigned properties: address, ordered services, reference photos, checklist, and can upload work photos.
+            </p>
+<div class="form">
+<div>
+<div class="label">Staff details</div>
+<div class="row-2">
+<input class="input" id="addStaffName" placeholder="Staff name (required)"/>
+<input class="input" id="addStaffEmail" placeholder="Email (required)" type="email"/>
+</div>
+<div style="height:10px"></div>
+<input class="input" id="addStaffPassword" placeholder="Password (required)" type="text"/>
+<div style="height:10px"></div>
+<button class="btn btn-primary" id="addStaffBtn" style="justify-content:center;" type="button">
+                  + Add staff
+                </button>
+</div>
+</div>
+<div class="divider"></div>
+<h3 style="margin:0 0 10px;">Remove staff</h3>
+<p class="section-sub" style="margin:0 0 12px;">
+              Delete staff users who no longer work here. This also removes them from all property assignments.
+            </p>
+<div class="form">
+<div>
+<div class="label">Select staff</div>
+<select class="input" id="removeStaffSelect">
+<option value="">— Select a staff member —</option>
+</select>
+<div style="height:10px"></div>
+<button class="btn btn-danger" id="removeStaffBtn" style="justify-content:center;" type="button">
+                  🗑️ Remove staff
+                </button>
+</div>
+</div>
+<div class="divider"></div>
+<h3 style="margin:0 0 10px;">Backup &amp; storage</h3>
+<p class="section-sub" style="margin:0 0 12px;">
+  Export/import the whole database as JSON. Recommended at least once a month.
+</p>
+<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+<button class="btn" id="exportBackupBtn" type="button">⬇️ Export JSON</button>
+<button class="btn" id="importBackupBtn" type="button">⬆️ Import JSON</button>
+<input accept="application/json" class="input file-hidden" id="importBackupFile" type="file"/>
+</div>
+<p class="small-note" id="backupHint" style="margin:10px 0 0;">—</p>
+<div class="cn-storage-box" style="margin-top:14px;">
+<div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+<strong>Storage usage</strong>
+<div style="display:flex; gap:10px; flex-wrap:wrap;">
+<button class="btn" id="storageRefreshBtn" type="button">Refresh</button>
+<button class="btn btn-danger" id="storageCleanupBtn" type="button">Cleanup old work photos</button>
+</div>
+</div>
+<div class="cn-storage-meter">
+<div class="cn-storage-fill" id="storageFill" style="width:0%;"></div>
+</div>
+<div class="small-note" id="storageText" style="margin-top:8px;">—</div>
+</div>
+<div class="divider"></div>
+<h3 style="margin:0 0 10px;">Activity log</h3>
+<p class="section-sub" style="margin:0 0 12px;">
+              Export a small audit trail (last 500 events). Useful for disputes: who started/finished jobs, photo uploads, booking changes.
+            </p>
+<div style="display:flex; gap:10px; flex-wrap:wrap;">
+<button class="btn" id="auditDownloadCsv" type="button">⬇️ Export log (CSV)</button>
+<button class="btn" id="auditDownloadJson" type="button">⬇️ Export log (JSON)</button>
+</div>
+<p class="small-note" id="auditLogHint" style="margin:10px 0 0;">—</p>
+</div>
+</div>
+<!-- (Staff + Client portals are separate route-based pages: /staff and /client) -->
+</div>
+</div></section>
+</main>
+
+
+
+
+
+
+
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js"></script></body>
+</html>

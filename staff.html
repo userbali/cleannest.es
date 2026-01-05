@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Clean-Nest • Staff Portal</title>
+<meta content="Clean-Nest staff portal" name="description"/>
+<link href="style.css" rel="stylesheet"/>
+</head>
+<body class="portal-page">
+<header class="header">
+<div class="wrap header-inner">
+<a class="brand" href="/login">
+<div aria-hidden="true" class="logo">
+<svg fill="none" height="22" viewbox="0 0 24 24" width="22">
+<path d="M4 11.5L12 5l8 6.5" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<path d="M7.5 10.8V20h9V10.8" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<path d="M11 20v-6h2v6" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div class="brand-title">
+<strong>Clean-Nest</strong>
+<span>STAFF</span>
+</div>
+</a>
+<div class="cta">
+<div class="theme-toggle" data-theme-ui="">
+<button aria-expanded="false" aria-haspopup="menu" class="btn" data-theme-button="" title="Theme" type="button">🌗 Theme</button>
+<div class="theme-menu" hidden="" role="menu">
+<button aria-checked="false" class="theme-opt" data-theme-set="system" role="menuitemradio" type="button">System</button>
+<button aria-checked="false" class="theme-opt" data-theme-set="light" role="menuitemradio" type="button">Light</button>
+<button aria-checked="false" class="theme-opt" data-theme-set="dark" role="menuitemradio" type="button">Dark</button>
+</div>
+</div>
+<button class="btn btn-danger" id="logoutBtn" type="button">Logout</button>
+</div>
+</div>
+</header>
+<main>
+<section class="portal" style="display:block;">
+<div class="wrap">
+<div class="portal-top">
+<div>
+<h2 class="section-title" style="margin:0;">Staff Portal</h2>
+<p class="section-sub" style="margin:6px 0 0;">Your assigned jobs and activities.</p>
+</div>
+<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+<span class="tag" id="roleTag">STAFF</span>
+<span class="tag" id="userTag">—</span>
+</div>
+</div>
+<div class="portal-grid-1" id="portalStaff" style="display:grid;">
+<div class="card">
+<h3 style="margin:0 0 10px;">Your timeline</h3>
+<p class="section-sub" style="margin:0 0 14px;">Everything assigned to you (bookings + activities). Completed items are marked.</p>
+<div class="timeline-head-controls" style="margin-bottom:10px; justify-content:flex-start;">
+<div aria-label="Range" class="seg-toggle" id="staffRangeToggle">
+<button class="seg-btn is-active" data-range="1" type="button">Today</button>
+<button class="seg-btn" data-range="7" type="button">7 days</button>
+<button class="seg-btn" data-range="30" type="button">30 days</button>
+</div>
+<button class="btn" id="staffExportCsv" type="button">⬇️ CSV</button>
+</div>
+<div id="staffBookings"></div>
+</div>
+</div>
+</div>
+</section>
+</main>
+
+
+
+
+
+
+
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/staff.js"></script></body>
+</html>
