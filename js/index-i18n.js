@@ -84,6 +84,13 @@
       "msg.sent": "Message sent. Thank you.",
       "msg.failed": "Send failed.",
 
+      "gdpr.title": "Privacy notice",
+      "gdpr.text": "We use necessary cookies and localStorage to run the site and remember your preferences. No marketing trackers.",
+      "gdpr.accept": "OK",
+      "gdpr.learn": "Learn more",
+      "privacy.title": "Privacy & GDPR",
+      "privacy.body": "We only use necessary cookies and localStorage to run the site and remember your preferences (language, theme). We do not use marketing trackers. If you contact us, we use your details only to reply.",
+
       "final.title": "Ready for a cleaner, fresher property?",
       "final.sub": "Message Clean-Nest on WhatsApp and we will take it from there.",
       "final.btn": "+34 624 680 309",
@@ -169,6 +176,13 @@
       "msg.sending": "Senden...",
       "msg.sent": "Nachricht gesendet. Danke.",
       "msg.failed": "Senden fehlgeschlagen.",
+
+      "gdpr.title": "Datenschutz Hinweis",
+      "gdpr.text": "Wir nutzen notwendige Cookies und localStorage, um die Seite zu betreiben und Praeferenzen zu speichern. Keine Marketing Tracker.",
+      "gdpr.accept": "OK",
+      "gdpr.learn": "Mehr Infos",
+      "privacy.title": "Datenschutz & GDPR",
+      "privacy.body": "Wir nutzen nur notwendige Cookies und localStorage, um die Seite zu betreiben und Praeferenzen zu speichern (Sprache, Theme). Keine Marketing Tracker. Wenn Sie uns kontaktieren, nutzen wir Ihre Daten nur fuer die Antwort.",
 
       "final.title": "Bereit fuer eine sauberere, frischere Immobilie?",
       "final.sub": "Schreiben Sie Clean-Nest per WhatsApp und wir uebernehmen den Rest.",
@@ -256,6 +270,13 @@
       "msg.sent": "Mensaje enviado. Gracias.",
       "msg.failed": "Error al enviar.",
 
+      "gdpr.title": "Aviso de privacidad",
+      "gdpr.text": "Usamos cookies necesarias y localStorage para que el sitio funcione y recordar tus preferencias. Sin rastreadores de marketing.",
+      "gdpr.accept": "OK",
+      "gdpr.learn": "Mas info",
+      "privacy.title": "Privacidad y GDPR",
+      "privacy.body": "Solo usamos cookies necesarias y localStorage para el sitio y tus preferencias (idioma, tema). Sin rastreadores de marketing. Si nos contactas, usamos tus datos solo para responder.",
+
       "final.title": "Listo para una propiedad mas limpia y fresca?",
       "final.sub": "Escribe a Clean-Nest por WhatsApp y nos encargamos del resto.",
       "final.btn": "+34 624 680 309",
@@ -341,6 +362,13 @@
       "msg.sending": "Sender...",
       "msg.sent": "Melding sendt. Takk.",
       "msg.failed": "Sending feilet.",
+
+      "gdpr.title": "Personvern varsel",
+      "gdpr.text": "Vi bruker nodvendige cookies og localStorage for at siden skal fungere og huske preferanser. Ingen markedsforing trackere.",
+      "gdpr.accept": "OK",
+      "gdpr.learn": "Les mer",
+      "privacy.title": "Personvern og GDPR",
+      "privacy.body": "Vi bruker kun nodvendige cookies og localStorage for siden og preferanser (sprak, tema). Ingen markedsforing trackere. Hvis du kontakter oss, bruker vi data kun for svar.",
 
       "final.title": "Klar for en renere og friskere eiendom?",
       "final.sub": "Send Clean-Nest en WhatsApp og vi tar det derfra.",

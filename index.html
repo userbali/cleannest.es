@@ -292,6 +292,15 @@
       </div>
     </section>
 
+    <section id="privacy">
+      <div class="wrap">
+        <div class="card">
+          <h2 class="section-title" data-i18n="privacy.title">Privacy &amp; GDPR</h2>
+          <p class="section-sub" data-i18n="privacy.body">We only use necessary cookies and localStorage to run the site and remember your preferences (language, theme). We do not use marketing trackers. If you contact us, we use your details only to reply.</p>
+        </div>
+      </div>
+    </section>
+
     <footer>
       <div class="wrap foot">
         <div data-i18n="footer.left" data-i18n-html>(c) <span id="y"></span> Clean-Nest Property Management - Gran Canaria</div>
@@ -300,12 +309,26 @@
     </footer>
   </main>
 
+  <div id="gdprBanner" class="gdpr-banner" role="dialog" aria-live="polite" hidden>
+    <div class="gdpr-card">
+      <div class="gdpr-text">
+        <strong data-i18n="gdpr.title">Privacy notice</strong>
+        <p data-i18n="gdpr.text">We use necessary cookies and localStorage to run the site and remember your preferences. No marketing trackers.</p>
+      </div>
+      <div class="gdpr-actions">
+        <a class="btn" href="#privacy" data-i18n="gdpr.learn">Learn more</a>
+        <button class="btn btn-primary" id="gdprAccept" type="button" data-i18n="gdpr.accept">OK</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/app-core.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/index-i18n.js"></script>
+  <script src="js/privacy.js"></script>
   <script src="js/login.js"></script>
   <script>
     (function () {
