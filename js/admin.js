@@ -61,6 +61,14 @@
     doneBtn: null,
     cancelBtn: null,
     reopenBtn: null,
+    priceInput: null,
+    priceSaveBtn: null,
+    priceMeta: null,
+    addOnList: null,
+    addOnLabel: null,
+    addOnAmount: null,
+    addOnAddBtn: null,
+    addOnTotal: null,
     currentTask: null
   };
 
@@ -249,6 +257,37 @@
     return startLabel;
   }
 
+  function parseAmount(value) {
+    if (value == null) return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    const num = Number(raw.replace(",", "."));
+    if (!Number.isFinite(num)) return null;
+    return num;
+  }
+
+  function formatAmount(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return "0.00";
+    return num.toFixed(2);
+  }
+
+  function normalizeAddOns(list) {
+    return (Array.isArray(list) ? list : []).map((row) => {
+      const label = String(row && row.label ? row.label : "").trim();
+      const amount = parseAmount(row && row.amount != null ? row.amount : "");
+      if (!label) return null;
+      return { label, amount: Number.isFinite(amount) ? amount : 0 };
+    }).filter(Boolean);
+  }
+
+  function sumAddOns(list) {
+    return (Array.isArray(list) ? list : []).reduce((total, row) => {
+      const val = Number(row && row.amount);
+      return total + (Number.isFinite(val) ? val : 0);
+    }, 0);
+  }
+
   function getMediaBucket() {
     const cfg = window.CN_CONFIG || {};
     const bucket = String(cfg.SUPABASE_MEDIA_BUCKET || "media").trim();
@@ -355,7 +394,7 @@
   async function loadTaskDetail(taskId) {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, assigned_user_id, property_id, label_id, property:properties(address)")
+      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, price, add_ons, assigned_user_id, property_id, label_id, property:properties(address)")
       .eq("id", taskId)
       .single();
     if (error) throw error;
@@ -529,6 +568,87 @@
     return { done: doneCount, total: list.length };
   }
 
+  function renderTaskAddOns(addOns) {
+    if (!taskDetail.addOnList) return;
+    const list = Array.isArray(addOns) ? addOns : [];
+    taskDetail.addOnList.innerHTML = "";
+    if (!list.length) {
+      taskDetail.addOnList.innerHTML = '<div class="small-note">No extras added.</div>';
+      return;
+    }
+    list.forEach((addon, idx) => {
+      const row = document.createElement("div");
+      row.className = "cn-addon-row";
+      const info = document.createElement("div");
+      const label = document.createElement("strong");
+      label.textContent = addon.label || "Extra";
+      const amount = document.createElement("span");
+      amount.className = "small-note";
+      amount.textContent = `+${formatAmount(addon.amount)} EUR`;
+      info.appendChild(label);
+      info.appendChild(document.createTextNode(" "));
+      info.appendChild(amount);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "btn btn-danger";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => {
+        const task = taskDetail.currentTask;
+        if (!task) return;
+        const updated = normalizeAddOns(task.add_ons);
+        if (idx < 0 || idx >= updated.length) return;
+        updated.splice(idx, 1);
+        updateTask(task.id, { add_ons: updated })
+          .then(() => {
+            task.add_ons = updated;
+            renderTaskPricing(task, getPropertyById(task.property_id), { keepPriceInput: true });
+            toast("Extra removed.", "ok");
+          })
+          .catch((e) => toast(e.message || String(e), "error"));
+      });
+
+      row.appendChild(info);
+      row.appendChild(removeBtn);
+      taskDetail.addOnList.appendChild(row);
+    });
+  }
+
+  function renderTaskPricing(task, property, options) {
+    if (!task) return;
+    const keepInput = options && options.keepPriceInput;
+    const propPrice = parseAmount(property && property.price);
+    const taskPrice = parseAmount(task.price);
+    const basePrice = Number.isFinite(taskPrice) ? taskPrice : (Number.isFinite(propPrice) ? propPrice : null);
+
+    if (taskDetail.priceInput && !keepInput) {
+      taskDetail.priceInput.value = basePrice != null ? formatAmount(basePrice) : "";
+    }
+
+    const addOns = normalizeAddOns(task.add_ons);
+    task.add_ons = addOns;
+    renderTaskAddOns(addOns);
+
+    if (taskDetail.priceMeta) {
+      if (Number.isFinite(taskPrice)) {
+        taskDetail.priceMeta.textContent = `Saved price: ${formatAmount(taskPrice)} EUR.`;
+      } else if (Number.isFinite(propPrice)) {
+        taskDetail.priceMeta.textContent = `Property price: ${formatAmount(propPrice)} EUR (save to snapshot).`;
+      } else {
+        taskDetail.priceMeta.textContent = "No property price set.";
+      }
+    }
+
+    if (taskDetail.addOnTotal) {
+      const extras = sumAddOns(addOns);
+      const parts = [`Extras total: ${formatAmount(extras)} EUR`];
+      if (Number.isFinite(basePrice)) {
+        parts.push(`Booking total: ${formatAmount(basePrice + extras)} EUR`);
+      }
+      taskDetail.addOnTotal.textContent = parts.join(" | ");
+    }
+  }
+
   function closeTaskDetailModal() {
     if (taskDetail.modal) taskDetail.modal.setAttribute("hidden", "");
   }
@@ -558,6 +678,29 @@
                 <span class="small-note" id="taskChecklistHint"></span>
               </div>
               <div class="checklist" id="taskChecklistList"></div>
+            </div>
+            <div class="card">
+              <div class="row" style="justify-content:space-between; align-items:center;">
+                <h3 style="margin:0;">Pricing</h3>
+                <span class="small-note" id="taskPriceMeta"></span>
+              </div>
+              <div style="margin-top:8px;">
+                <div class="label">Base price (per cleaning)</div>
+                <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap;">
+                  <input class="input" id="taskPriceInput" type="number" step="0.01" min="0" placeholder="0.00"/>
+                  <button class="btn btn-primary" id="taskPriceSave" type="button">Save price</button>
+                </div>
+                <div class="label" style="margin-top:12px;">Extra services (optional)</div>
+                <div id="taskAddOnsList" class="cn-addon-list"></div>
+                <div class="row-2" style="margin-top:8px;">
+                  <input class="input" id="taskAddOnLabel" placeholder="e.g. Deep clean"/>
+                  <input class="input" id="taskAddOnAmount" type="number" step="0.01" placeholder="20.00"/>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; flex-wrap:wrap;">
+                  <button class="btn" id="taskAddOnAdd" type="button">+ Add extra</button>
+                  <div class="small-note" id="taskAddOnTotal"></div>
+                </div>
+              </div>
             </div>
             <div class="card">
               <div class="row" style="justify-content:space-between; align-items:center;">
@@ -599,6 +742,14 @@
     taskDetail.doneBtn = modal.querySelector("#taskDoneBtn");
     taskDetail.cancelBtn = modal.querySelector("#taskCancelBtn");
     taskDetail.reopenBtn = modal.querySelector("#taskReopenBtn");
+    taskDetail.priceInput = modal.querySelector("#taskPriceInput");
+    taskDetail.priceSaveBtn = modal.querySelector("#taskPriceSave");
+    taskDetail.priceMeta = modal.querySelector("#taskPriceMeta");
+    taskDetail.addOnList = modal.querySelector("#taskAddOnsList");
+    taskDetail.addOnLabel = modal.querySelector("#taskAddOnLabel");
+    taskDetail.addOnAmount = modal.querySelector("#taskAddOnAmount");
+    taskDetail.addOnAddBtn = modal.querySelector("#taskAddOnAdd");
+    taskDetail.addOnTotal = modal.querySelector("#taskAddOnTotal");
 
     taskDetail.refInput = document.createElement("input");
     taskDetail.refInput.type = "file";
@@ -691,6 +842,82 @@
       });
     }
 
+    if (taskDetail.priceSaveBtn) {
+      taskDetail.priceSaveBtn.addEventListener("click", () => {
+        const task = taskDetail.currentTask;
+        if (!task) return;
+        const raw = taskDetail.priceInput ? taskDetail.priceInput.value.trim() : "";
+        let nextPrice = null;
+        if (raw) {
+          const parsed = parseAmount(raw);
+          if (!Number.isFinite(parsed) || parsed < 0) {
+            toast("Enter a valid price.", "error");
+            return;
+          }
+          nextPrice = parsed;
+        }
+        updateTask(task.id, { price: nextPrice })
+          .then(() => {
+            task.price = nextPrice;
+            renderTaskPricing(task, getPropertyById(task.property_id), { keepPriceInput: false });
+            toast("Price saved.", "ok");
+          })
+          .catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+
+    if (taskDetail.priceInput) {
+      taskDetail.priceInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && taskDetail.priceSaveBtn) {
+          taskDetail.priceSaveBtn.click();
+        }
+      });
+    }
+
+    if (taskDetail.addOnAddBtn) {
+      taskDetail.addOnAddBtn.addEventListener("click", () => {
+        const task = taskDetail.currentTask;
+        if (!task) return;
+        const label = (taskDetail.addOnLabel ? taskDetail.addOnLabel.value : "").trim();
+        const amountRaw = (taskDetail.addOnAmount ? taskDetail.addOnAmount.value : "").trim();
+        if (!label) {
+          toast("Enter an extra service name.", "error");
+          return;
+        }
+        const parsed = parseAmount(amountRaw);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          toast("Enter a valid amount.", "error");
+          return;
+        }
+        const list = normalizeAddOns(task.add_ons);
+        list.push({ label, amount: parsed });
+        updateTask(task.id, { add_ons: list })
+          .then(() => {
+            task.add_ons = list;
+            if (taskDetail.addOnLabel) taskDetail.addOnLabel.value = "";
+            if (taskDetail.addOnAmount) taskDetail.addOnAmount.value = "";
+            renderTaskPricing(task, getPropertyById(task.property_id), { keepPriceInput: true });
+            toast("Extra added.", "ok");
+          })
+          .catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+
+    if (taskDetail.addOnLabel) {
+      taskDetail.addOnLabel.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && taskDetail.addOnAddBtn) {
+          taskDetail.addOnAddBtn.click();
+        }
+      });
+    }
+    if (taskDetail.addOnAmount) {
+      taskDetail.addOnAmount.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && taskDetail.addOnAddBtn) {
+          taskDetail.addOnAddBtn.click();
+        }
+      });
+    }
+
     return taskDetail;
   }
 
@@ -741,7 +968,7 @@
 
     detail.currentTask = task;
 
-    const prop = task.property || getPropertyById(task.property_id);
+    const prop = getPropertyById(task.property_id) || task.property;
     const label = getLabelById(task.label_id);
     if (detail.title) {
       detail.title.textContent = `${label ? label.name : "Task"} • ${prop ? prop.address : "Property"}`;
@@ -777,6 +1004,10 @@
     if (detail.checklistHint) {
       detail.checklistHint.textContent = checklistStats.total ? `${checklistStats.done}/${checklistStats.total} done` : "No checklist items yet.";
     }
+
+    if (taskDetail.addOnLabel) taskDetail.addOnLabel.value = "";
+    if (taskDetail.addOnAmount) taskDetail.addOnAmount.value = "";
+    renderTaskPricing(task, prop);
 
     const [refRaw, workRaw] = await Promise.all([
       loadMediaLinks({ propertyId: task.property_id, tag: "reference" }),
@@ -938,7 +1169,7 @@
   async function loadProperties() {
     const { data, error } = await CN.sb
       .from("properties")
-      .select("id, owner_user_id, address, ownership_type, notes, created_at, owner:profiles(id, name, email, phone)")
+      .select("id, owner_user_id, address, ownership_type, price, notes, created_at, owner:profiles(id, name, email, phone)")
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -1440,6 +1671,86 @@
     overviewCard.appendChild(overviewBody);
     list.appendChild(overviewCard);
 
+    const pricingCard = document.createElement("div");
+    pricingCard.className = "card";
+    const pricingHead = document.createElement("div");
+    pricingHead.className = "row";
+    pricingHead.style.justifyContent = "space-between";
+    pricingHead.style.alignItems = "center";
+    const pricingTitle = document.createElement("h3");
+    pricingTitle.style.margin = "0";
+    pricingTitle.textContent = "Pricing";
+    pricingHead.appendChild(pricingTitle);
+    pricingCard.appendChild(pricingHead);
+
+    const pricingBody = document.createElement("div");
+    pricingBody.style.marginTop = "8px";
+    const priceLabel = document.createElement("div");
+    priceLabel.className = "label";
+    priceLabel.textContent = "Price per cleaning";
+    const priceRow = document.createElement("div");
+    priceRow.className = "row";
+    priceRow.style.gap = "8px";
+    priceRow.style.alignItems = "center";
+    priceRow.style.flexWrap = "wrap";
+    const priceInput = document.createElement("input");
+    priceInput.className = "input";
+    priceInput.type = "number";
+    priceInput.step = "0.01";
+    priceInput.min = "0";
+    priceInput.placeholder = "0.00";
+    priceInput.value = property.price != null ? String(property.price) : "";
+    const priceSave = document.createElement("button");
+    priceSave.type = "button";
+    priceSave.className = "btn btn-primary";
+    priceSave.textContent = "Save price";
+    const priceMeta = document.createElement("div");
+    priceMeta.className = "small-note";
+    priceMeta.style.marginTop = "6px";
+    const updatePriceMeta = () => {
+      const current = parseAmount(property.price);
+      if (Number.isFinite(current)) {
+        priceMeta.textContent = `Current price: ${formatAmount(current)} EUR. Used for new bookings.`;
+      } else {
+        priceMeta.textContent = "No price set yet. Used for new bookings.";
+      }
+    };
+    updatePriceMeta();
+    priceSave.addEventListener("click", async () => {
+      const raw = priceInput.value.trim();
+      let nextPrice = null;
+      if (raw) {
+        const parsed = parseAmount(raw);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          toast("Enter a valid price.", "error");
+          return;
+        }
+        nextPrice = parsed;
+      }
+      try {
+        const { error } = await CN.sb
+          .from("properties")
+          .update({ price: nextPrice })
+          .eq("id", property.id);
+        if (error) throw error;
+        property.price = nextPrice;
+        updatePriceMeta();
+        toast("Price saved.", "ok");
+      } catch (e) {
+        toast(e.message || String(e), "error");
+      }
+    });
+    priceInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") priceSave.click();
+    });
+    priceRow.appendChild(priceInput);
+    priceRow.appendChild(priceSave);
+    pricingBody.appendChild(priceLabel);
+    pricingBody.appendChild(priceRow);
+    pricingBody.appendChild(priceMeta);
+    pricingCard.appendChild(pricingBody);
+    list.appendChild(pricingCard);
+
     const assetsCard = document.createElement("div");
     assetsCard.className = "card";
     const assetsHead = document.createElement("div");
@@ -1605,9 +1916,26 @@
 
     const historyCard = document.createElement("div");
     historyCard.className = "card";
-    historyCard.innerHTML = "<h3>Recent cleanings</h3>";
+    const historyHead = document.createElement("div");
+    historyHead.className = "row";
+    historyHead.style.justifyContent = "space-between";
+    historyHead.style.alignItems = "center";
+    const historyTitle = document.createElement("h3");
+    historyTitle.style.margin = "0";
+    historyTitle.textContent = "Recent cleanings";
+    const historyBtn = document.createElement("button");
+    historyBtn.type = "button";
+    historyBtn.className = "btn";
+    historyBtn.textContent = "Session history";
+    historyBtn.addEventListener("click", () => {
+      window.location.href = `sessions.html?propertyId=${encodeURIComponent(property.id)}`;
+    });
+    historyHead.appendChild(historyTitle);
+    historyHead.appendChild(historyBtn);
+    historyCard.appendChild(historyHead);
     const historyList = document.createElement("div");
     historyList.className = "booking-history-list";
+    historyList.style.marginTop = "10px";
     try {
       const tasks = await loadPropertyTasks(property.id);
       if (!tasks.length) {
@@ -2048,6 +2376,11 @@
       created_by_user_id: userId,
       notes: notes || null
     };
+    const prop = getPropertyById(propertyId);
+    const propPrice = parseAmount(prop && prop.price);
+    if (Number.isFinite(propPrice)) {
+      payload.price = propPrice;
+    }
     if (!tbd && els.timelineAddTime) {
       const time = els.timelineAddTime.value || "09:00";
       const start = new Date(`${toDateInputValue(day)}T${time}:00`);

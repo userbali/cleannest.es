@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Clean-Nest - Session History</title>
+<meta content="Cleaning session history" name="description"/>
+<link href="style.css" rel="stylesheet"/>
+</head>
+<body class="portal-page">
+<header class="header">
+<div class="wrap header-inner">
+<a class="brand" href="index.html">
+<div aria-hidden="true" class="logo">
+<img alt="Clean-Nest logo" src="pics/logo.png"/>
+</div>
+<div class="brand-title">
+<strong>Clean-Nest</strong>
+<span>SESSION HISTORY</span>
+</div>
+</a>
+<div class="cta">
+<div class="theme-toggle" data-theme-ui="">
+<button aria-expanded="false" aria-haspopup="menu" class="btn" data-theme-button="" title="Theme" type="button">Theme</button>
+<div class="theme-menu" hidden="" role="menu">
+<button aria-checked="false" class="theme-opt" data-theme-set="system" role="menuitemradio" type="button">System</button>
+<button aria-checked="false" class="theme-opt" data-theme-set="light" role="menuitemradio" type="button">Light</button>
+<button aria-checked="false" class="theme-opt" data-theme-set="dark" role="menuitemradio" type="button">Dark</button>
+</div>
+</div>
+<button class="btn" id="backBtn" type="button">Back</button>
+<button class="btn btn-danger" id="logoutBtn" type="button">Logout</button>
+</div>
+</div>
+</header>
+<main>
+<section class="portal" style="display:block;">
+<div class="wrap">
+<div class="portal-top">
+<div>
+<h2 class="section-title" style="margin:0;">Session history</h2>
+<p class="section-sub" id="subLine" style="margin:6px 0 0;">Loading...</p>
+</div>
+<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+<span class="tag" id="roleTag">ROLE</span>
+<span class="tag" id="userTag">USER</span>
+</div>
+</div>
+<div class="card">
+<div id="sessionsRoot"></div>
+</div>
+</div>
+</section>
+</main>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/sessions.js"></script></body>
+</html>

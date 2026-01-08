@@ -368,7 +368,7 @@
                 <h3 style="margin:0;">Work photos</h3>
                 <button class="btn btn-ref" id="taskWorkUpload" type="button">Upload work photo</button>
               </div>
-              <div class="small-note" style="margin-top:6px;">At least one work photo is required to complete.</div>
+              <div class="small-note" style="margin-top:6px;">Upload work photos from the job.</div>
               <div id="taskWorkGallery"></div>
             </div>
             <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px;">
@@ -423,19 +423,14 @@
       taskDetail.startBtn.addEventListener("click", () => {
         const task = taskDetail.currentTask;
         if (!task) return;
-        updateTaskStatus(task.id, { status: "in_progress", started_at: new Date().toISOString() })
-          .then(async () => {
-            await refresh();
-            await openTaskDetail(task.id);
-          })
-          .catch((e) => toast(e.message || String(e), "error"));
+        startTask(task).catch((e) => toast(e.message || String(e), "error"));
       });
     }
     if (taskDetail.doneBtn) {
       taskDetail.doneBtn.addEventListener("click", () => {
         const task = taskDetail.currentTask;
         if (!task) return;
-        attemptCompleteTask(task).catch((e) => toast(e.message || String(e), "error"));
+        completeTask(task).catch((e) => toast(e.message || String(e), "error"));
       });
     }
 
@@ -447,6 +442,34 @@
     const closed = task.status === "done" || task.status === "canceled";
     taskDetail.startBtn.style.display = closed ? "none" : "";
     taskDetail.doneBtn.style.display = closed ? "none" : "";
+  }
+
+  async function staffStartTask(taskId) {
+    const { error } = await CN.sb.rpc("staff_start_task", { p_task_id: taskId });
+    if (error) throw error;
+  }
+
+  async function staffCompleteTask(taskId) {
+    const { error } = await CN.sb.rpc("staff_complete_task", { p_task_id: taskId });
+    if (error) throw error;
+  }
+
+  async function startTask(item) {
+    await staffStartTask(item.id);
+    toast("Started.", "ok");
+    await refresh();
+    if (taskDetail.modal && !taskDetail.modal.hasAttribute("hidden")) {
+      await openTaskDetail(item.id);
+    }
+  }
+
+  async function completeTask(item) {
+    await staffCompleteTask(item.id);
+    toast("Completed.", "ok");
+    await refresh();
+    if (taskDetail.modal && !taskDetail.modal.hasAttribute("hidden")) {
+      await openTaskDetail(item.id);
+    }
   }
 
   async function handleWorkUpload(files) {
@@ -519,38 +542,6 @@
 
     updateTaskDetailActions(task);
     detail.modal.removeAttribute("hidden");
-  }
-
-  async function canCompleteTask(task) {
-    if (!task) return { ok: false, reason: "Task not found." };
-    await ensureTaskChecklist(task.id, task.property_id);
-    const checklist = await loadTaskChecklistItems(task.id);
-    const remaining = checklist.filter((item) => !item.done).length;
-    if (remaining) {
-      return { ok: false, reason: `Checklist incomplete (${remaining} items).` };
-    }
-    const workMedia = await loadMediaLinks({ taskId: task.id });
-    if (!workMedia.length) {
-      return { ok: false, reason: "Add at least one work photo before completing." };
-    }
-    return { ok: true };
-  }
-
-  async function attemptCompleteTask(item) {
-    const task = typeof item === "string" ? await loadTaskDetail(item) : await loadTaskDetail(item.id);
-    const check = await canCompleteTask(task);
-    if (!check.ok) {
-      toast(check.reason, "error");
-      await openTaskDetail(task.id);
-      return false;
-    }
-    await updateTaskStatus(task.id, { status: "done", completed_at: new Date().toISOString() });
-    toast("Task completed.", "ok");
-    await refresh();
-    if (taskDetail.modal && !taskDetail.modal.hasAttribute("hidden")) {
-      await openTaskDetail(task.id);
-    }
-    return true;
   }
 
   function statusBadge(status) {
@@ -720,52 +711,27 @@
         });
         actions.appendChild(detailBtn);
       }
-      if (item.status !== "done" && item.status !== "canceled") {
+      if (item.kind === "task" && item.status !== "done" && item.status !== "canceled") {
         const startBtn = document.createElement("button");
         startBtn.className = "btn";
         startBtn.type = "button";
         startBtn.textContent = "Start";
-        startBtn.addEventListener("click", () => updateItemStatus(item, "in_progress"));
+        startBtn.addEventListener("click", () => startTask(item).catch((e) => toast(e.message || String(e), "error")));
         const doneBtn = document.createElement("button");
         doneBtn.className = "btn";
         doneBtn.type = "button";
         doneBtn.textContent = "Done";
-        doneBtn.addEventListener("click", () => updateItemStatus(item, "done"));
+        doneBtn.addEventListener("click", () => completeTask(item).catch((e) => toast(e.message || String(e), "error")));
         actions.appendChild(startBtn);
         actions.appendChild(doneBtn);
       }
-      card.appendChild(actions);
+      if (actions.children.length) {
+        card.appendChild(actions);
+      }
       list.appendChild(card);
     });
 
     listEl.appendChild(list);
-  }
-
-  async function updateTaskStatus(taskId, patch) {
-    const { error } = await CN.sb.from("tasks").update(patch).eq("id", taskId);
-    if (error) throw error;
-  }
-
-  async function updateItemStatus(item, status) {
-    const patch = { status };
-    if (status === "in_progress") patch.started_at = new Date().toISOString();
-    if (status === "done") patch.completed_at = new Date().toISOString();
-    try {
-      if (item.kind === "task") {
-        if (status === "done") {
-          await attemptCompleteTask(item);
-          return;
-        }
-        await updateTaskStatus(item.id, patch);
-      } else {
-        const { error } = await CN.sb.from("activities").update(patch).eq("id", item.id);
-        if (error) throw error;
-      }
-      toast("Saved.", "ok");
-      await refresh();
-    } catch (e) {
-      toast(e.message || String(e), "error");
-    }
   }
 
   async function refresh() {
