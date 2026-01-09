@@ -1000,6 +1000,11 @@ section{ padding: 56px 0; }
 }
 .card h3{ margin:0 0 10px; font-size:16px; color: var(--text); }
 
+#reviews .review-stars{
+  color: #f2b01e;
+  letter-spacing: 2px;
+}
+
 .split{
   display:grid;
   grid-template-columns: 1fr 1fr;
