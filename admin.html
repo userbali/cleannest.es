@@ -94,22 +94,21 @@
 <div class="portal-admin-head">
 <div>
 <h3 style="margin:0;">Timeline</h3>
-<p class="section-sub" style="margin:6px 0 0;">Review cleanings for the selected month. Click a day to add a booking.</p>
+<p class="section-sub" style="margin:6px 0 0;">Review cleanings for the selected month. Click a day to jump to it.</p>
 </div>
 <div class="timeline-head-controls">
-<span class="tag" id="timelineMonthLabel">Current month</span>
+<div class="timeline-head-group">
 <input aria-label="Month" class="input" id="timelineMonth" type="month"/>
 <div aria-label="Heatmap metric" class="seg-toggle" id="timelineMetricToggle">
 <button class="seg-btn is-active" data-metric="jobs" type="button">Jobs</button>
 <button class="seg-btn" data-metric="hours" type="button">Hours</button>
 </div>
-<label class="chip-check" title="Show only bookings with no staff assigned">
-<input id="timelineUnassignedOnly" type="checkbox"/>
-<span>Unassigned</span>
-</label>
+</div>
+<div class="timeline-head-group">
 <button class="btn" id="timelineExportCsv" type="button">CSV</button>
 <button class="btn" id="timelinePrint" type="button">Print</button>
 <button class="btn" id="timelineJumpToday" type="button">This month</button>
+</div>
 </div>
 </div>
 <div aria-label="Month overview" class="timeline-heatmap" id="timelineHeatmap"></div>

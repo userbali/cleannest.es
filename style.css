@@ -1977,6 +1977,29 @@ footer{
   padding: 6px;
 }
 
+.pricing-inline{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pricing-inline__label{
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+.pricing-inline__input{
+  width: 110px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.pricing-inline__btn{
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
 /* (kept above) */
 
 /* Mobile: keep everything inline under the selected property */
@@ -2430,10 +2453,17 @@ footer{
    ============================= */
 .timeline-head-controls{
   display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.timeline-head-group{
+  display:flex;
   gap:10px;
   flex-wrap:wrap;
   align-items:center;
-  justify-content:flex-end;
 }
 
 .seg-toggle{

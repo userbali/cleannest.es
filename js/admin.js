@@ -92,7 +92,6 @@
     timelineMonthLabel: $("timelineMonthLabel"),
     timelineMonth: $("timelineMonth"),
     timelineMetricToggle: $("timelineMetricToggle"),
-    timelineUnassignedOnly: $("timelineUnassignedOnly"),
     timelineExportCsv: $("timelineExportCsv"),
     timelinePrint: $("timelinePrint"),
     timelineJumpToday: $("timelineJumpToday"),
@@ -1502,10 +1501,6 @@
     }
 
     const owner = property.owner || state.clients.find((c) => c.id === property.owner_user_id);
-    const stats = buildPropertyStats();
-    const lastDone = stats.lastDone.get(property.id);
-    const staffCount = stats.staffCount.get(property.id) || 0;
-    const hasActive = stats.active.has(property.id);
     let checklistItems = [];
     let checklistError = null;
     let referenceItems = [];
@@ -1559,57 +1554,16 @@
 
     const list = document.createElement("div");
     list.className = "cx-preview__list";
-
-    const staffList = document.createElement("div");
-    staffList.className = "pe-staff-list";
-    state.staff.forEach((staff) => {
-      const item = document.createElement("label");
-      item.className = "pe-staff-item cx-staff-item";
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.checked = state.propertyStaff.some((ps) => ps.property_id === property.id && ps.staff_user_id === staff.id);
-      input.addEventListener("change", async (ev) => {
-        try {
-          await togglePropertyStaff(property.id, staff.id, ev.target.checked);
-          renderClientsList();
-          toast("Staff updated.", "ok");
-        } catch (e) {
-          toast(e.message || String(e), "error");
-        }
-      });
-      const label = document.createElement("div");
-      label.textContent = staff.name || staff.email || "Staff";
-      item.appendChild(input);
-      item.appendChild(label);
-      staffList.appendChild(item);
-    });
     const rawNotes = (property.notes || "").trim();
     const notesText = rawNotes;
 
-    const pricingCard = document.createElement("div");
-    pricingCard.className = "card";
-    const pricingHead = document.createElement("div");
-    pricingHead.className = "row";
-    pricingHead.style.justifyContent = "space-between";
-    pricingHead.style.alignItems = "center";
-    const pricingTitle = document.createElement("h3");
-    pricingTitle.style.margin = "0";
-    pricingTitle.textContent = "Pricing";
-    pricingHead.appendChild(pricingTitle);
-    pricingCard.appendChild(pricingHead);
-
-    const pricingBody = document.createElement("div");
-    pricingBody.style.marginTop = "8px";
-    const priceLabel = document.createElement("div");
-    priceLabel.className = "label";
-    priceLabel.textContent = "Price per cleaning";
-    const priceRow = document.createElement("div");
-    priceRow.className = "row";
-    priceRow.style.gap = "8px";
-    priceRow.style.alignItems = "center";
-    priceRow.style.flexWrap = "wrap";
+    const pricingInline = document.createElement("div");
+    pricingInline.className = "pricing-inline";
+    const pricingLabel = document.createElement("span");
+    pricingLabel.className = "pricing-inline__label";
+    pricingLabel.textContent = "Price";
     const priceInput = document.createElement("input");
-    priceInput.className = "input";
+    priceInput.className = "input pricing-inline__input";
     priceInput.type = "number";
     priceInput.step = "0.01";
     priceInput.min = "0";
@@ -1617,20 +1571,8 @@
     priceInput.value = property.price != null ? String(property.price) : "";
     const priceSave = document.createElement("button");
     priceSave.type = "button";
-    priceSave.className = "btn btn-primary";
-    priceSave.textContent = "Save price";
-    const priceMeta = document.createElement("div");
-    priceMeta.className = "small-note";
-    priceMeta.style.marginTop = "6px";
-    const updatePriceMeta = () => {
-      const current = parseAmount(property.price);
-      if (Number.isFinite(current)) {
-        priceMeta.textContent = `Current price: ${formatAmount(current)} EUR. Used for new bookings.`;
-      } else {
-        priceMeta.textContent = "No price set yet. Used for new bookings.";
-      }
-    };
-    updatePriceMeta();
+    priceSave.className = "btn btn-primary pricing-inline__btn";
+    priceSave.textContent = "Save";
     priceSave.addEventListener("click", async () => {
       const raw = priceInput.value.trim();
       let nextPrice = null;
@@ -1649,7 +1591,6 @@
           .eq("id", property.id);
         if (error) throw error;
         property.price = nextPrice;
-        updatePriceMeta();
         toast("Price saved.", "ok");
       } catch (e) {
         toast(e.message || String(e), "error");
@@ -1658,71 +1599,22 @@
     priceInput.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") priceSave.click();
     });
-    priceRow.appendChild(priceInput);
-    priceRow.appendChild(priceSave);
-    pricingBody.appendChild(priceLabel);
-    pricingBody.appendChild(priceRow);
-    pricingBody.appendChild(priceMeta);
-    pricingCard.appendChild(pricingBody);
-
-    const staffCard = document.createElement("div");
-    staffCard.className = "card";
-    const staffHead = document.createElement("div");
-    staffHead.className = "row";
-    staffHead.style.justifyContent = "space-between";
-    staffHead.style.alignItems = "center";
-    const staffTitle = document.createElement("h3");
-    staffTitle.style.margin = "0";
-    staffTitle.textContent = "Staff";
-    const scheduleBtn = document.createElement("button");
-    scheduleBtn.className = "btn btn-primary";
-    scheduleBtn.id = "propScheduleBtn";
-    scheduleBtn.type = "button";
-    scheduleBtn.textContent = "Schedule cleaning";
-    scheduleBtn.addEventListener("click", async () => {
-      const date = new Date();
-      const monthValue = toMonthInputValue(date);
-      if (els.timelineMonth) {
-        els.timelineMonth.value = monthValue;
-      }
-      state.timeline.month = monthValue;
-      setActiveTab("timeline");
-      try {
-        await refreshTimeline();
-      } catch (e) {
-        toast(e.message || String(e), "error");
-      }
-      openTimelineAddModal(date, property.id);
-    });
-    staffHead.appendChild(staffTitle);
-    staffHead.appendChild(scheduleBtn);
-    staffCard.appendChild(staffHead);
-    if (staffCount > 0) {
-      const staffMeta = document.createElement("div");
-      staffMeta.className = "small-note";
-      staffMeta.style.marginTop = "6px";
-      staffMeta.textContent = `${staffCount} assigned`;
-      staffCard.appendChild(staffMeta);
-    }
-    staffList.classList.add("cx-staff-grid");
-    staffList.style.marginTop = staffCount > 0 ? "8px" : "6px";
-    staffCard.appendChild(staffList);
-
-    const detailRow = document.createElement("div");
-    detailRow.className = "row-2";
-    detailRow.appendChild(pricingCard);
-    detailRow.appendChild(staffCard);
-    list.appendChild(detailRow);
+    pricingInline.appendChild(pricingLabel);
+    pricingInline.appendChild(priceInput);
+    pricingInline.appendChild(priceSave);
 
     const assetsCard = document.createElement("div");
     assetsCard.className = "card";
     const assetsHead = document.createElement("div");
     assetsHead.className = "row";
+    assetsHead.style.display = "flex";
     assetsHead.style.justifyContent = "space-between";
     assetsHead.style.alignItems = "center";
-    assetsHead.innerHTML = `
-      <h3 style="margin:0;">Notes</h3>
-    `;
+    const notesTitle = document.createElement("h3");
+    notesTitle.style.margin = "0";
+    notesTitle.textContent = "Notes";
+    assetsHead.appendChild(notesTitle);
+    assetsHead.appendChild(pricingInline);
     assetsCard.appendChild(assetsHead);
 
     const notesBody = document.createElement("div");
@@ -1968,12 +1860,6 @@
       });
     }
 
-    if (els.timelineUnassignedOnly) {
-      els.timelineUnassignedOnly.addEventListener("change", () => {
-        refreshTimeline().catch((e) => toast(e.message || String(e), "error"));
-      });
-    }
-
     if (els.timelineExportCsv) {
       els.timelineExportCsv.addEventListener("click", () => exportTimelineCsv());
     }
@@ -2043,14 +1929,12 @@
 
     const monthTasks = await loadTimelineTasks(monthStart, monthEnd);
 
-    const unassignedOnly = els.timelineUnassignedOnly ? els.timelineUnassignedOnly.checked : false;
-    const filtered = unassignedOnly ? monthTasks.filter((t) => !t.assigned_user_id) : monthTasks;
-    state.timeline.tasks = filtered;
-    state.timeline.monthTasks = filtered;
+    state.timeline.tasks = monthTasks;
+    state.timeline.monthTasks = monthTasks;
     state.timeline.startDate = monthStart;
     state.timeline.endDate = monthEnd;
 
-    renderTimeline(filtered, filtered, monthStart, monthEnd);
+    renderTimeline(monthTasks, monthTasks, monthStart, monthEnd);
   }
 
   function renderTimeline(tasks, monthTasks, startDate, endDate) {
@@ -2072,6 +1956,8 @@
       const dayTasks = tasksByDay.get(key) || [];
       const dayCard = document.createElement("div");
       dayCard.className = "timeline-day";
+      dayCard.dataset.date = key;
+      dayCard.id = `timeline-day-${key}`;
       const head = document.createElement("div");
       head.className = "timeline-day__head";
 
@@ -2195,6 +2081,13 @@
     renderTimelineHeatmap(monthTasks, startDate);
   }
 
+  function scrollTimelineToDate(dateStr) {
+    if (!els.timelineDays || !dateStr) return;
+    const target = els.timelineDays.querySelector(`[data-date="${dateStr}"]`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function renderTimelineHeatmap(monthTasks, focusDate) {
     if (!els.timelineHeatmap) return;
     const monthStart = startOfMonth(focusDate);
@@ -2249,7 +2142,9 @@
       cell.dataset.date = key;
       cell.innerHTML = `<div class="hm-day__num">${day.getDate()}</div><div class="hm-day__cnt">${state.timeline.metric === "hours" ? val.toFixed(1) + "h" : val + " jobs"}</div>`;
       if (!(day < monthStart || day > monthEnd)) {
-        cell.addEventListener("click", () => openTimelineAddModal(day));
+        cell.addEventListener("click", () => {
+          scrollTimelineToDate(key);
+        });
       }
       grid.appendChild(cell);
     }
