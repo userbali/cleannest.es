@@ -43,6 +43,14 @@
     return startLabel;
   }
 
+  function fmtActualRange(startedAt, completedAt) {
+    if (!startedAt && !completedAt) return "";
+    const startLabel = fmtTime(startedAt);
+    const endLabel = fmtTime(completedAt);
+    if (startLabel && endLabel) return `${startLabel} - ${endLabel}`;
+    return startLabel || endLabel || "";
+  }
+
   function getMediaBucket() {
     const cfg = window.CN_CONFIG || {};
     const bucket = String(cfg.SUPABASE_MEDIA_BUCKET || "media").trim();
@@ -171,10 +179,16 @@
       const meta = document.createElement("div");
       meta.className = "small-note";
       const staffName = task.assigned_user_id ? (staffMap.get(task.assigned_user_id) || "Staff") : "Unassigned";
-      const parts = [
-        fmtTimeRange(task.start_at, task.end_at, task.duration_minutes),
-        staffName
-      ];
+      const parts = [];
+      const plannedLabel = fmtTimeRange(task.start_at, task.end_at, task.duration_minutes);
+      const actualLabel = fmtActualRange(task.started_at, task.completed_at);
+      if (actualLabel) {
+        if (plannedLabel && plannedLabel !== "Time TBD") parts.push(`Planned: ${plannedLabel}`);
+        parts.push(`Actual: ${actualLabel}`);
+      } else if (plannedLabel) {
+        parts.push(plannedLabel);
+      }
+      parts.push(staffName);
       if (task.notes) parts.push(task.notes);
       meta.textContent = parts.filter(Boolean).join(" | ");
       if (meta.textContent) card.appendChild(meta);
@@ -222,7 +236,7 @@
   async function loadTasks(propertyId) {
     let query = CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, assigned_user_id, completed_at, label:task_labels(name)")
+      .select("id, day_date, status, duration_minutes, start_at, end_at, started_at, completed_at, notes, assigned_user_id, label:task_labels(name)")
       .eq("property_id", propertyId)
       .eq("status", "done")
       .order("day_date", { ascending: false })

@@ -75,14 +75,6 @@
 <!-- Search / filter bar (full-width) -->
 <div class="admin-props-toolbar" id="adminControls">
 <input class="input admin-search" id="adminSearch" placeholder="Search owner, phone, address, notes…"/>
-<label class="chip-check" title="Show only properties with an active session">
-<input id="filterActiveSession" type="checkbox"/>
-<span>Active session</span>
-</label>
-<label class="chip-check" title="Active session OR no staff assigned OR last cleaned older than 14 days">
-<input id="filterNeedsAttention" type="checkbox"/>
-<span>Needs attention</span>
-</label>
 <select aria-label="Sort" class="input admin-sort" id="adminSort">
 <option value="due">Sort: Due (oldest cleaned)</option>
 <option value="recent">Sort: Recent (newest cleaned)</option>
@@ -102,15 +94,11 @@
 <div class="portal-admin-head">
 <div>
 <h3 style="margin:0;">Timeline</h3>
-<p class="section-sub" style="margin:6px 0 0;">Plan upcoming cleanings. Scroll the next 30 days. Click a day to add a booking.</p>
+<p class="section-sub" style="margin:6px 0 0;">Review cleanings for the selected month. Click a day to add a booking.</p>
 </div>
 <div class="timeline-head-controls">
 <span class="tag" id="timelineMonthLabel">Current month</span>
-<div aria-label="Range" class="seg-toggle" id="timelineRangeToggle">
-<button class="seg-btn is-active" data-range="1" type="button">Today</button>
-<button class="seg-btn" data-range="7" type="button">Next 7</button>
-<button class="seg-btn" data-range="30" type="button">Next 30</button>
-</div>
+<input aria-label="Month" class="input" id="timelineMonth" type="month"/>
 <div aria-label="Heatmap metric" class="seg-toggle" id="timelineMetricToggle">
 <button class="seg-btn is-active" data-metric="jobs" type="button">Jobs</button>
 <button class="seg-btn" data-metric="hours" type="button">Hours</button>
@@ -119,13 +107,13 @@
 <input id="timelineUnassignedOnly" type="checkbox"/>
 <span>Unassigned</span>
 </label>
-<button class="btn" id="timelineExportCsv" type="button">⬇️ CSV</button>
-<button class="btn" id="timelinePrint" type="button">🖨️ Print</button>
-<button class="btn" id="timelineJumpToday" type="button">Today</button>
+<button class="btn" id="timelineExportCsv" type="button">CSV</button>
+<button class="btn" id="timelinePrint" type="button">Print</button>
+<button class="btn" id="timelineJumpToday" type="button">This month</button>
 </div>
 </div>
 <div aria-label="Month overview" class="timeline-heatmap" id="timelineHeatmap"></div>
-<div aria-label="Next 30 days" class="timeline-days" id="timelineDays"></div>
+<div aria-label="Month days" class="timeline-days" id="timelineDays"></div>
 <!-- Add booking modal -->
 <div class="cn-modal" hidden="" id="timelineAddModal">
 <div class="cn-modal__overlay" data-action="timeline-add-cancel"></div>
@@ -521,3 +509,4 @@ Currency: EUR" rows="4" style="margin-top:10px; width:100%;"></textarea>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js"></script></body>
 </html>
+

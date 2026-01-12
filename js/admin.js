@@ -29,7 +29,7 @@
     selectedPropertyId: null,
     activeTab: "properties",
     timeline: {
-      rangeDays: 1,
+      month: "",
       metric: "jobs",
       selectedDate: null,
       selectedPropertyId: null
@@ -90,7 +90,7 @@
     adminClientsList: $("adminClientsList"),
     adminPropDetail: $("adminPropDetail"),
     timelineMonthLabel: $("timelineMonthLabel"),
-    timelineRangeToggle: $("timelineRangeToggle"),
+    timelineMonth: $("timelineMonth"),
     timelineMetricToggle: $("timelineMetricToggle"),
     timelineUnassignedOnly: $("timelineUnassignedOnly"),
     timelineExportCsv: $("timelineExportCsv"),
@@ -1417,34 +1417,12 @@
         const sub = document.createElement("div");
         sub.className = "cx-prop-row__sub";
         const lastStr = stats.lastDone.get(prop.id);
-        const lastLabel = lastStr ? `Last cleaned: ${lastStr}` : "No cleanings yet";
+        const lastLabel = lastStr ? `Last cleaned: ${lastStr}` : "";
         sub.textContent = [prop.notes, lastLabel].filter(Boolean).join(" | ");
         col.appendChild(addr);
         col.appendChild(sub);
 
-        const badges = document.createElement("div");
-        badges.className = "cx-prop-badges";
-        if (stats.active.has(prop.id)) {
-          const chip = document.createElement("div");
-          chip.className = "cx-chip active";
-          chip.textContent = "Active";
-          badges.appendChild(chip);
-        }
-        if ((stats.staffCount.get(prop.id) || 0) === 0) {
-          const chip = document.createElement("div");
-          chip.className = "cx-chip unassigned";
-          chip.textContent = "Unassigned";
-          badges.appendChild(chip);
-        }
-        if (stats.needsAttention.has(prop.id)) {
-          const chip = document.createElement("div");
-          chip.className = "cx-chip attn";
-          chip.textContent = "Needs attention";
-          badges.appendChild(chip);
-        }
-
         btn.appendChild(col);
-        btn.appendChild(badges);
         btn.addEventListener("click", () => {
           state.selectedPropertyId = prop.id;
           renderClientsList();
@@ -1607,69 +1585,6 @@
     });
     const rawNotes = (property.notes || "").trim();
     const notesText = rawNotes;
-    const overviewCard = document.createElement("div");
-    overviewCard.className = "card cx-overview-card";
-    const scheduleBtn = document.createElement("button");
-    scheduleBtn.className = "btn btn-primary cx-overview-action";
-    scheduleBtn.id = "propScheduleBtn";
-    scheduleBtn.type = "button";
-    scheduleBtn.textContent = "Schedule cleaning";
-    scheduleBtn.addEventListener("click", () => {
-      openTimelineAddModal(new Date(), property.id);
-    });
-    const overviewHead = document.createElement("div");
-    overviewHead.className = "cx-overview-head";
-    const overviewTitle = document.createElement("h3");
-    overviewTitle.style.margin = "0";
-    overviewTitle.textContent = "Status & staff";
-    overviewHead.appendChild(overviewTitle);
-    overviewHead.appendChild(scheduleBtn);
-    overviewCard.appendChild(overviewHead);
-
-    const pillsRow = document.createElement("div");
-    pillsRow.className = "cx-overview-pills";
-    const statusPill = document.createElement("span");
-    statusPill.className = `meta-pill ${hasActive ? "" : "warn"}`;
-    statusPill.textContent = hasActive ? "Active session" : "No active session";
-    const cleanedPill = document.createElement("span");
-    cleanedPill.className = `meta-pill ${lastDone ? "" : "warn"}`;
-    cleanedPill.textContent = lastDone ? `Last cleaned: ${lastDone}` : "No cleanings yet";
-    const staffPill = document.createElement("span");
-    staffPill.className = "meta-pill";
-    staffPill.textContent = `Assigned staff: ${staffCount}`;
-    pillsRow.appendChild(statusPill);
-    pillsRow.appendChild(cleanedPill);
-    pillsRow.appendChild(staffPill);
-
-    const statusSection = document.createElement("div");
-    statusSection.className = "cx-overview-section";
-    const statusTitle = document.createElement("div");
-    statusTitle.className = "cx-overview-subtitle";
-    statusTitle.textContent = "Status";
-    statusSection.appendChild(statusTitle);
-    statusSection.appendChild(pillsRow);
-
-    const staffSection = document.createElement("div");
-    staffSection.className = "cx-staff-section cx-overview-section";
-    const staffTitle = document.createElement("div");
-    staffTitle.className = "cx-staff-title";
-    const staffTitleText = document.createElement("span");
-    staffTitleText.textContent = "Assign staff";
-    const staffCountText = document.createElement("span");
-    staffCountText.className = "cx-staff-count";
-    staffCountText.textContent = `${staffCount} assigned`;
-    staffTitle.appendChild(staffTitleText);
-    staffTitle.appendChild(staffCountText);
-    staffSection.appendChild(staffTitle);
-    staffList.classList.add("cx-staff-grid");
-    staffSection.appendChild(staffList);
-
-    const overviewBody = document.createElement("div");
-    overviewBody.className = "cx-overview-body";
-    overviewBody.appendChild(statusSection);
-    overviewBody.appendChild(staffSection);
-    overviewCard.appendChild(overviewBody);
-    list.appendChild(overviewCard);
 
     const pricingCard = document.createElement("div");
     pricingCard.className = "card";
@@ -1749,7 +1664,55 @@
     pricingBody.appendChild(priceRow);
     pricingBody.appendChild(priceMeta);
     pricingCard.appendChild(pricingBody);
-    list.appendChild(pricingCard);
+
+    const staffCard = document.createElement("div");
+    staffCard.className = "card";
+    const staffHead = document.createElement("div");
+    staffHead.className = "row";
+    staffHead.style.justifyContent = "space-between";
+    staffHead.style.alignItems = "center";
+    const staffTitle = document.createElement("h3");
+    staffTitle.style.margin = "0";
+    staffTitle.textContent = "Staff";
+    const scheduleBtn = document.createElement("button");
+    scheduleBtn.className = "btn btn-primary";
+    scheduleBtn.id = "propScheduleBtn";
+    scheduleBtn.type = "button";
+    scheduleBtn.textContent = "Schedule cleaning";
+    scheduleBtn.addEventListener("click", async () => {
+      const date = new Date();
+      const monthValue = toMonthInputValue(date);
+      if (els.timelineMonth) {
+        els.timelineMonth.value = monthValue;
+      }
+      state.timeline.month = monthValue;
+      setActiveTab("timeline");
+      try {
+        await refreshTimeline();
+      } catch (e) {
+        toast(e.message || String(e), "error");
+      }
+      openTimelineAddModal(date, property.id);
+    });
+    staffHead.appendChild(staffTitle);
+    staffHead.appendChild(scheduleBtn);
+    staffCard.appendChild(staffHead);
+    if (staffCount > 0) {
+      const staffMeta = document.createElement("div");
+      staffMeta.className = "small-note";
+      staffMeta.style.marginTop = "6px";
+      staffMeta.textContent = `${staffCount} assigned`;
+      staffCard.appendChild(staffMeta);
+    }
+    staffList.classList.add("cx-staff-grid");
+    staffList.style.marginTop = staffCount > 0 ? "8px" : "6px";
+    staffCard.appendChild(staffList);
+
+    const detailRow = document.createElement("div");
+    detailRow.className = "row-2";
+    detailRow.appendChild(pricingCard);
+    detailRow.appendChild(staffCard);
+    list.appendChild(detailRow);
 
     const assetsCard = document.createElement("div");
     assetsCard.className = "card";
@@ -1987,14 +1950,10 @@
   }
 
   function wireTimelineControls() {
-    if (els.timelineRangeToggle) {
-      els.timelineRangeToggle.querySelectorAll("[data-range]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const range = Number(btn.getAttribute("data-range"));
-          state.timeline.rangeDays = range;
-          setActiveToggle(els.timelineRangeToggle, "range", String(range));
-          refreshTimeline().catch((e) => toast(e.message || String(e), "error"));
-        });
+    if (els.timelineMonth) {
+      els.timelineMonth.addEventListener("change", () => {
+        state.timeline.month = els.timelineMonth.value || "";
+        refreshTimeline().catch((e) => toast(e.message || String(e), "error"));
       });
     }
 
@@ -2025,7 +1984,12 @@
 
     if (els.timelineJumpToday) {
       els.timelineJumpToday.addEventListener("click", () => {
-        state.timeline.startDate = new Date();
+        const today = new Date();
+        const monthValue = toMonthInputValue(today);
+        if (els.timelineMonth) {
+          els.timelineMonth.value = monthValue;
+        }
+        state.timeline.month = monthValue;
         refreshTimeline().catch((e) => toast(e.message || String(e), "error"));
       });
     }
@@ -2066,24 +2030,27 @@
   async function refreshTimeline() {
     if (!els.timelineDays) return;
     const today = new Date();
-    const startDate = state.timeline.startDate || today;
-    const endDate = addDays(startDate, state.timeline.rangeDays - 1);
-    const monthStart = startOfMonth(startDate);
-    const monthEnd = endOfMonth(startDate);
+    const selectedMonth = state.timeline.month || (els.timelineMonth ? els.timelineMonth.value : "");
+    const monthDate = fromMonthInputValue(selectedMonth) || today;
+    const monthStart = startOfMonth(monthDate);
+    const monthEnd = endOfMonth(monthDate);
+    const normalizedMonth = toMonthInputValue(monthStart);
 
-    const [rangeTasks, monthTasks] = await Promise.all([
-      loadTimelineTasks(startDate, endDate),
-      loadTimelineTasks(monthStart, monthEnd)
-    ]);
+    if (els.timelineMonth && els.timelineMonth.value !== normalizedMonth) {
+      els.timelineMonth.value = normalizedMonth;
+    }
+    state.timeline.month = normalizedMonth;
+
+    const monthTasks = await loadTimelineTasks(monthStart, monthEnd);
 
     const unassignedOnly = els.timelineUnassignedOnly ? els.timelineUnassignedOnly.checked : false;
-    const filtered = unassignedOnly ? rangeTasks.filter((t) => !t.assigned_user_id) : rangeTasks;
+    const filtered = unassignedOnly ? monthTasks.filter((t) => !t.assigned_user_id) : monthTasks;
     state.timeline.tasks = filtered;
-    state.timeline.monthTasks = monthTasks;
-    state.timeline.startDate = startDate;
-    state.timeline.endDate = endDate;
+    state.timeline.monthTasks = filtered;
+    state.timeline.startDate = monthStart;
+    state.timeline.endDate = monthEnd;
 
-    renderTimeline(filtered, monthTasks, startDate, endDate);
+    renderTimeline(filtered, filtered, monthStart, monthEnd);
   }
 
   function renderTimeline(tasks, monthTasks, startDate, endDate) {
@@ -2093,7 +2060,7 @@
     }
 
     const tasksByDay = groupBy(tasks, (t) => t.day_date);
-    const dayCount = state.timeline.rangeDays;
+    const dayCount = endDate.getDate();
     const dayList = [];
     for (let i = 0; i < dayCount; i += 1) {
       dayList.push(addDays(startDate, i));
