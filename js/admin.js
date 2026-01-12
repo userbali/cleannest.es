@@ -91,7 +91,6 @@
     adminPropDetail: $("adminPropDetail"),
     timelineMonthLabel: $("timelineMonthLabel"),
     timelineMonth: $("timelineMonth"),
-    timelineMetricToggle: $("timelineMetricToggle"),
     timelineExportCsv: $("timelineExportCsv"),
     timelinePrint: $("timelinePrint"),
     timelineJumpToday: $("timelineJumpToday"),
@@ -1846,17 +1845,6 @@
       els.timelineMonth.addEventListener("change", () => {
         state.timeline.month = els.timelineMonth.value || "";
         refreshTimeline().catch((e) => toast(e.message || String(e), "error"));
-      });
-    }
-
-    if (els.timelineMetricToggle) {
-      els.timelineMetricToggle.querySelectorAll("[data-metric]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const metric = btn.getAttribute("data-metric");
-          state.timeline.metric = metric === "hours" ? "hours" : "jobs";
-          setActiveToggle(els.timelineMetricToggle, "metric", state.timeline.metric);
-          renderTimeline(state.timeline.tasks || [], state.timeline.monthTasks || [], state.timeline.startDate, state.timeline.endDate);
-        });
       });
     }
 
