@@ -32,7 +32,8 @@
       month: "",
       metric: "jobs",
       selectedDate: null,
-      selectedPropertyId: null
+      selectedPropertyId: null,
+      activities: []
     },
     schedule: {
       month: "",
@@ -134,6 +135,7 @@
     activityStaff: $("activityStaff"),
     activityProperty: $("activityProperty"),
     activityNotes: $("activityNotes"),
+    activityTypeColorPalette: $("activityTypeColorPalette"),
     activitySave: $("activitySave"),
     modulesList: $("modulesList"),
     adminToolsBtn: $("adminToolsBtn"),
@@ -197,6 +199,48 @@
     if (!value) return null;
     const [y, m] = value.split("-").map(Number);
     return new Date(y, m - 1, 1);
+  }
+
+  function normalizeHexColor(value) {
+    if (!value) return "";
+    let val = String(value).trim();
+    if (!val) return "";
+    if (!val.startsWith("#")) val = `#${val}`;
+    if (/^#[0-9a-f]{3}$/i.test(val)) {
+      val = `#${val[1]}${val[1]}${val[2]}${val[2]}${val[3]}${val[3]}`;
+    }
+    if (!/^#[0-9a-f]{6}$/i.test(val)) return "";
+    return val.toLowerCase();
+  }
+
+  function applyActivityColor(el, color) {
+    if (!el) return;
+    const normalized = normalizeHexColor(color);
+    if (!normalized) return;
+    el.classList.add("has-activity-color");
+    el.style.setProperty("--activity-color", normalized);
+  }
+
+  function getSelectedPaletteColor(name) {
+    const selected = document.querySelector(`input[name="${name}"]:checked`);
+    return selected ? selected.value : "";
+  }
+
+  function resetPaletteSelection(name) {
+    const inputs = document.querySelectorAll(`input[name="${name}"]`);
+    if (!inputs.length) return;
+    inputs.forEach((input, idx) => {
+      input.checked = idx === 0;
+    });
+  }
+
+  function getActivityColor(activity) {
+    if (activity && activity.color) return activity.color;
+    if (activity && activity.type_id) {
+      const type = state.activityTypes.find((t) => t.id === activity.type_id);
+      return type && type.color ? type.color : "";
+    }
+    return "";
   }
 
   function addDays(date, days) {
@@ -1231,7 +1275,7 @@
   async function loadActivityTypes() {
     const { data, error } = await CN.sb
       .from("activity_types")
-      .select("id, name, default_duration_minutes, is_archived")
+      .select("id, name, default_duration_minutes, is_archived, color")
       .eq("tenant_id", tenantId)
       .order("name", { ascending: true });
     if (error) throw error;
@@ -1243,10 +1287,21 @@
     await loadProperties();
     await loadPropertyStaff();
     await loadTaskLabels();
-    await loadModules();
-    await seedMissingModules();
+    try {
+      await loadModules();
+      await seedMissingModules();
+    } catch (e) {
+      state.modules = {};
+      toast("Modules could not load. Check permissions.", "error");
+    }
+    state.modules.modules = true;
     await loadTasksCache();
-    await loadActivityTypes();
+    try {
+      await loadActivityTypes();
+    } catch (e) {
+      state.activityTypes = [];
+      toast("Activity types could not load. Check permissions.", "error");
+    }
   }
 
   function buildPropertyStats() {
@@ -1916,22 +1971,25 @@
     state.timeline.month = normalizedMonth;
 
     const monthTasks = await loadTimelineTasks(monthStart, monthEnd);
+    const monthActivities = await loadActivities(monthStart, monthEnd);
 
     state.timeline.tasks = monthTasks;
     state.timeline.monthTasks = monthTasks;
+    state.timeline.activities = monthActivities;
     state.timeline.startDate = monthStart;
     state.timeline.endDate = monthEnd;
 
-    renderTimeline(monthTasks, monthTasks, monthStart, monthEnd);
+    renderTimeline(monthTasks, monthTasks, monthActivities, monthStart, monthEnd);
   }
 
-  function renderTimeline(tasks, monthTasks, startDate, endDate) {
+  function renderTimeline(tasks, monthTasks, activities, startDate, endDate) {
     if (!els.timelineDays || !els.timelineHeatmap) return;
     if (els.timelineMonthLabel) {
       els.timelineMonthLabel.textContent = fmtMonthLabel(startDate);
     }
 
     const tasksByDay = groupBy(tasks, (t) => t.day_date);
+    const activitiesByDay = groupBy(activities || [], (a) => a.day_date);
     const dayCount = endDate.getDate();
     const dayList = [];
     for (let i = 0; i < dayCount; i += 1) {
@@ -1942,6 +2000,7 @@
     dayList.forEach((day) => {
       const key = toDateInputValue(day);
       const dayTasks = tasksByDay.get(key) || [];
+      const dayActivities = activitiesByDay.get(key) || [];
       const dayCard = document.createElement("div");
       dayCard.className = "timeline-day";
       dayCard.dataset.date = key;
@@ -1955,8 +2014,17 @@
       titleStrong.textContent = fmtDateLabel(day);
       const titleSub = document.createElement("p");
       titleSub.className = "small-note";
-      const totalHours = dayTasks.reduce((sum, t) => sum + (t.duration_minutes || 0), 0) / 60;
-      titleSub.textContent = `${dayTasks.length} jobs, ${totalHours.toFixed(1)}h`;
+      const taskMinutes = dayTasks.reduce((sum, t) => sum + (t.duration_minutes || 0), 0);
+      const activityMinutes = dayActivities.reduce((sum, a) => sum + (a.duration_minutes || 0), 0);
+      const totalHours = (taskMinutes + activityMinutes) / 60;
+      const summaryParts = [];
+      const isEmptyDay = !dayTasks.length && !dayActivities.length;
+      if (dayTasks.length) summaryParts.push(`${dayTasks.length} job${dayTasks.length === 1 ? "" : "s"}`);
+      if (dayActivities.length) summaryParts.push(`${dayActivities.length} activit${dayActivities.length === 1 ? "y" : "ies"}`);
+      if (isEmptyDay) summaryParts.push("0 jobs");
+      summaryParts.push(`${totalHours.toFixed(1)}h`);
+      if (isEmptyDay) summaryParts.push("no bookings or activities yet.");
+      titleSub.textContent = summaryParts.join(", ");
       title.appendChild(titleStrong);
       title.appendChild(titleSub);
 
@@ -1972,101 +2040,143 @@
       head.appendChild(headActions);
       dayCard.appendChild(head);
 
-      const body = document.createElement("div");
-      body.className = "timeline-day__body";
-      if (!dayTasks.length) {
-        const empty = document.createElement("div");
-        empty.className = "empty-state";
-        empty.innerHTML = '<div class="empty-state__msg">No bookings yet.</div>';
-        body.appendChild(empty);
-      } else {
-        dayTasks.forEach((task) => {
+      const dayItems = [];
+      dayTasks.forEach((task) => dayItems.push({ kind: "task", start: task.start_at, item: task }));
+      dayActivities.forEach((activity) => dayItems.push({ kind: "activity", start: activity.start_at, item: activity }));
+      dayItems.sort((a, b) => {
+        const aTime = a.start ? new Date(a.start).getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b.start ? new Date(b.start).getTime() : Number.POSITIVE_INFINITY;
+        if (aTime !== bTime) return aTime - bTime;
+        if (a.kind !== b.kind) return a.kind === "task" ? -1 : 1;
+        return 0;
+      });
+      if (dayItems.length) {
+        const body = document.createElement("div");
+        body.className = "timeline-day__body";
+        dayItems.forEach((row) => {
+          if (row.kind === "task") {
+            const task = row.item;
+            const booking = document.createElement("div");
+            booking.className = "timeline-booking";
+            if (task.status === "done") booking.classList.add("is-done");
+            if (task.status === "canceled") booking.classList.add("is-cancelled");
+            if (isSameDay(day, new Date())) booking.classList.add("is-focus");
+
+            const main = document.createElement("div");
+            main.className = "timeline-booking__main";
+            const time = document.createElement("div");
+            time.className = "timeline-booking__time";
+            time.textContent = fmtTimeRange(task.start_at, task.end_at, task.duration_minutes);
+            const addr = document.createElement("div");
+            addr.className = "timeline-booking__addr";
+            addr.textContent = (task.property && task.property.address) || (getPropertyById(task.property_id) || {}).address || "Property";
+            const meta = document.createElement("div");
+            meta.className = "timeline-booking__meta";
+            const label = getLabelById(task.label_id);
+            const staffName = task.assigned_user_id ? getStaffName(task.assigned_user_id) : "Unassigned";
+            meta.textContent = [label ? label.name : "Task", staffName, task.notes].filter(Boolean).join(" | ");
+            main.appendChild(time);
+            main.appendChild(addr);
+            main.appendChild(meta);
+
+            const actions = document.createElement("div");
+            actions.className = "timeline-booking__actions";
+            const detailBtn = document.createElement("button");
+            detailBtn.className = "btn";
+            detailBtn.type = "button";
+            detailBtn.textContent = "Details";
+            detailBtn.addEventListener("click", () => {
+              openTaskDetail(task).catch((e) => toast(e.message || String(e), "error"));
+            });
+            actions.appendChild(detailBtn);
+            if (task.status !== "done" && task.status !== "canceled") {
+              const startBtn = document.createElement("button");
+              startBtn.className = "btn";
+              startBtn.type = "button";
+              startBtn.textContent = "Start";
+              startBtn.addEventListener("click", () => {
+                updateTask(task.id, { status: "in_progress", started_at: new Date().toISOString() })
+                  .then(refreshTaskViews)
+                  .catch((e) => toast(e.message || String(e), "error"));
+              });
+              const doneBtn = document.createElement("button");
+              doneBtn.className = "btn";
+              doneBtn.type = "button";
+              doneBtn.textContent = "Done";
+              doneBtn.addEventListener("click", () => {
+                attemptCompleteTask(task).catch((e) => toast(e.message || String(e), "error"));
+              });
+              const cancelBtn = document.createElement("button");
+              cancelBtn.className = "btn";
+              cancelBtn.type = "button";
+              cancelBtn.textContent = "Cancel";
+              cancelBtn.addEventListener("click", () => {
+                updateTask(task.id, { status: "canceled" })
+                  .then(refreshTaskViews)
+                  .catch((e) => toast(e.message || String(e), "error"));
+              });
+              actions.appendChild(startBtn);
+              actions.appendChild(doneBtn);
+              actions.appendChild(cancelBtn);
+            } else {
+              const reopen = document.createElement("button");
+              reopen.className = "btn";
+              reopen.type = "button";
+              reopen.textContent = "Reopen";
+              reopen.addEventListener("click", () => {
+                updateTask(task.id, { status: "planned", started_at: null, completed_at: null })
+                  .then(refreshTaskViews)
+                  .catch((e) => toast(e.message || String(e), "error"));
+              });
+              actions.appendChild(reopen);
+            }
+
+            booking.appendChild(main);
+            booking.appendChild(actions);
+            body.appendChild(booking);
+            return;
+          }
+
+          const activity = row.item;
           const booking = document.createElement("div");
           booking.className = "timeline-booking";
-          if (task.status === "done") booking.classList.add("is-done");
-          if (task.status === "canceled") booking.classList.add("is-cancelled");
+          if (activity.status === "done") booking.classList.add("is-done");
+          if (activity.status === "canceled") booking.classList.add("is-cancelled");
           if (isSameDay(day, new Date())) booking.classList.add("is-focus");
+          applyActivityColor(booking, getActivityColor(activity));
 
           const main = document.createElement("div");
           main.className = "timeline-booking__main";
           const time = document.createElement("div");
           time.className = "timeline-booking__time";
-          time.textContent = fmtTimeRange(task.start_at, task.end_at, task.duration_minutes);
+          time.textContent = fmtTimeRange(activity.start_at, null, activity.duration_minutes);
           const addr = document.createElement("div");
           addr.className = "timeline-booking__addr";
-          addr.textContent = (task.property && task.property.address) || (getPropertyById(task.property_id) || {}).address || "Property";
+          const prop = activity.property_id ? getPropertyById(activity.property_id) : null;
+          const typeName = activity.type_name_snapshot || "Activity";
+          addr.textContent = prop ? prop.address : typeName;
           const meta = document.createElement("div");
           meta.className = "timeline-booking__meta";
-          const label = getLabelById(task.label_id);
-          const staffName = task.assigned_user_id ? getStaffName(task.assigned_user_id) : "Unassigned";
-          meta.textContent = [label ? label.name : "Task", staffName, task.notes].filter(Boolean).join(" | ");
+          const staffName = activity.assigned_user_id ? getStaffName(activity.assigned_user_id) : "Unassigned";
+          const metaParts = [];
+          if (prop) metaParts.push(typeName);
+          metaParts.push(staffName);
+          if (activity.notes) metaParts.push(activity.notes);
+          meta.textContent = metaParts.filter(Boolean).join(" | ");
           main.appendChild(time);
           main.appendChild(addr);
           main.appendChild(meta);
 
-          const actions = document.createElement("div");
-          actions.className = "timeline-booking__actions";
-          const detailBtn = document.createElement("button");
-          detailBtn.className = "btn";
-          detailBtn.type = "button";
-          detailBtn.textContent = "Details";
-          detailBtn.addEventListener("click", () => {
-            openTaskDetail(task).catch((e) => toast(e.message || String(e), "error"));
-          });
-          actions.appendChild(detailBtn);
-          if (task.status !== "done" && task.status !== "canceled") {
-            const startBtn = document.createElement("button");
-            startBtn.className = "btn";
-            startBtn.type = "button";
-            startBtn.textContent = "Start";
-            startBtn.addEventListener("click", () => {
-              updateTask(task.id, { status: "in_progress", started_at: new Date().toISOString() })
-                .then(refreshTaskViews)
-                .catch((e) => toast(e.message || String(e), "error"));
-            });
-            const doneBtn = document.createElement("button");
-            doneBtn.className = "btn";
-            doneBtn.type = "button";
-            doneBtn.textContent = "Done";
-            doneBtn.addEventListener("click", () => {
-              attemptCompleteTask(task).catch((e) => toast(e.message || String(e), "error"));
-            });
-            const cancelBtn = document.createElement("button");
-            cancelBtn.className = "btn";
-            cancelBtn.type = "button";
-            cancelBtn.textContent = "Cancel";
-            cancelBtn.addEventListener("click", () => {
-              updateTask(task.id, { status: "canceled" })
-                .then(refreshTaskViews)
-                .catch((e) => toast(e.message || String(e), "error"));
-            });
-            actions.appendChild(startBtn);
-            actions.appendChild(doneBtn);
-            actions.appendChild(cancelBtn);
-          } else {
-            const reopen = document.createElement("button");
-            reopen.className = "btn";
-            reopen.type = "button";
-            reopen.textContent = "Reopen";
-            reopen.addEventListener("click", () => {
-              updateTask(task.id, { status: "planned", started_at: null, completed_at: null })
-                .then(refreshTaskViews)
-                .catch((e) => toast(e.message || String(e), "error"));
-            });
-            actions.appendChild(reopen);
-          }
-
           booking.appendChild(main);
-          booking.appendChild(actions);
           body.appendChild(booking);
         });
+        dayCard.appendChild(body);
       }
 
-      dayCard.appendChild(body);
       els.timelineDays.appendChild(dayCard);
     });
 
-    renderTimelineHeatmap(monthTasks, startDate);
+    renderTimelineHeatmap(monthTasks, activities, startDate);
   }
 
   function scrollTimelineToDate(dateStr) {
@@ -2076,22 +2186,25 @@
     target.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function renderTimelineHeatmap(monthTasks, focusDate) {
+  function renderTimelineHeatmap(monthTasks, monthActivities, focusDate) {
     if (!els.timelineHeatmap) return;
     const monthStart = startOfMonth(focusDate);
     const monthEnd = endOfMonth(focusDate);
     const startOffset = monthStart.getDay();
     const gridStart = addDays(monthStart, -startOffset);
     const monthTasksByDay = groupBy(monthTasks, (t) => t.day_date);
+    const monthActivitiesByDay = groupBy(monthActivities || [], (a) => a.day_date);
 
     const values = [];
     for (let i = 0; i < 42; i += 1) {
       const day = addDays(gridStart, i);
       const key = toDateInputValue(day);
       const dayTasks = monthTasksByDay.get(key) || [];
+      const dayActivities = monthActivitiesByDay.get(key) || [];
       const val = state.timeline.metric === "hours"
-        ? dayTasks.reduce((sum, t) => sum + (t.duration_minutes || 0), 0) / 60
-        : dayTasks.length;
+        ? (dayTasks.reduce((sum, t) => sum + (t.duration_minutes || 0), 0)
+          + dayActivities.reduce((sum, a) => sum + (a.duration_minutes || 0), 0)) / 60
+        : dayTasks.length + dayActivities.length;
       values.push(val);
     }
     const maxVal = Math.max(...values, 0);
@@ -2114,9 +2227,11 @@
       const day = addDays(gridStart, i);
       const key = toDateInputValue(day);
       const dayTasks = monthTasksByDay.get(key) || [];
+      const dayActivities = monthActivitiesByDay.get(key) || [];
       const val = state.timeline.metric === "hours"
-        ? dayTasks.reduce((sum, t) => sum + (t.duration_minutes || 0), 0) / 60
-        : dayTasks.length;
+        ? (dayTasks.reduce((sum, t) => sum + (t.duration_minutes || 0), 0)
+          + dayActivities.reduce((sum, a) => sum + (a.duration_minutes || 0), 0)) / 60
+        : dayTasks.length + dayActivities.length;
       let level = 0;
       if (val > 0) level = 1;
       if (val > 1) level = 2;
@@ -2569,7 +2684,7 @@
   async function loadActivities(startDate, endDate) {
     const { data, error } = await CN.sb
       .from("activities")
-      .select("id, day_date, status, duration_minutes, start_at, notes, assigned_user_id, type_id, type_name_snapshot, property_id")
+      .select("*")
       .eq("tenant_id", tenantId)
       .gte("day_date", toDateInputValue(startDate))
       .lte("day_date", toDateInputValue(endDate))
@@ -2580,11 +2695,16 @@
 
   async function refreshActivities() {
     if (!els.activitiesPanel || !els.activitiesMonth) return;
-    const monthDate = fromMonthInputValue(els.activitiesMonth.value) || new Date();
-    const startDate = startOfMonth(monthDate);
-    const endDate = endOfMonth(monthDate);
-    const activities = await loadActivities(startDate, endDate);
-    renderActivities(activities);
+    try {
+      const monthDate = fromMonthInputValue(els.activitiesMonth.value) || new Date();
+      const startDate = startOfMonth(monthDate);
+      const endDate = endOfMonth(monthDate);
+      const activities = await loadActivities(startDate, endDate);
+      renderActivities(activities);
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e);
+      els.activitiesPanel.innerHTML = `<div class="empty-state"><div class="empty-state__msg">${msg}</div></div>`;
+    }
   }
 
   function renderActivities(activities) {
@@ -2622,6 +2742,7 @@
         booking.className = "timeline-booking";
         if (activity.status === "done") booking.classList.add("is-done");
         if (activity.status === "canceled") booking.classList.add("is-cancelled");
+        applyActivityColor(booking, getActivityColor(activity));
 
         const main = document.createElement("div");
         main.className = "timeline-booking__main";
@@ -2700,6 +2821,7 @@
     if (!els.activityTypeModal) return;
     if (els.activityTypeName) els.activityTypeName.value = "";
     if (els.activityTypeDefaultDuration) els.activityTypeDefaultDuration.value = "30";
+    resetPaletteSelection("activityTypeColor");
     els.activityTypeModal.removeAttribute("hidden");
   }
 
@@ -2714,10 +2836,12 @@
       return;
     }
     const duration = els.activityTypeDefaultDuration ? Number(els.activityTypeDefaultDuration.value || 30) : 30;
+    const color = normalizeHexColor(getSelectedPaletteColor("activityTypeColor"));
     const { error } = await CN.sb.from("activity_types").insert({
       tenant_id: tenantId,
       name,
       default_duration_minutes: duration,
+      color: color || null,
       is_archived: false,
       created_by_user_id: userId
     });
@@ -2800,6 +2924,7 @@
   async function saveActivity() {
     const typeId = els.activityTypeSelect ? els.activityTypeSelect.value : "custom";
     let typeName = "";
+    let typeColor = "";
     if (typeId === "custom") {
       typeName = els.activityCustomName ? els.activityCustomName.value.trim() : "";
       if (!typeName) {
@@ -2809,6 +2934,7 @@
     } else {
       const type = state.activityTypes.find((t) => t.id === typeId);
       typeName = type ? type.name : "";
+      typeColor = type ? type.color || "" : "";
     }
 
     const day = els.activityDate ? els.activityDate.value : "";
@@ -2820,6 +2946,7 @@
     const staffId = els.activityStaff ? els.activityStaff.value : "";
     const propId = els.activityProperty ? els.activityProperty.value : "";
     const notes = els.activityNotes ? els.activityNotes.value.trim() : "";
+    const color = normalizeHexColor(typeColor);
     const time = els.activityTimeFrom ? els.activityTimeFrom.value : "";
     const payload = {
       tenant_id: tenantId,
@@ -2833,6 +2960,9 @@
       notes: notes || null,
       created_by_user_id: userId
     };
+    if (color) {
+      payload.color = color;
+    }
     if (time) {
       const start = new Date(`${day}T${time}:00`);
       payload.start_at = start.toISOString();
@@ -2868,6 +2998,15 @@
       if (!tabs[key]) return;
       tabs[key].style.display = key === tabKey ? "block" : "none";
     });
+    if (tabKey === "modules") {
+      renderModulesList();
+    }
+    if (tabKey === "activities") {
+      refreshActivities().catch((e) => toast(e.message || String(e), "error"));
+    }
+    if (tabKey === "timeline") {
+      refreshTimeline().catch((e) => toast(e.message || String(e), "error"));
+    }
   }
 
   function wireTabs() {
@@ -2906,6 +3045,10 @@
   }
 
   async function updateModule(key, enabled) {
+    if (key === "modules") {
+      toast("Modules tab is always enabled.", "error");
+      return;
+    }
     const { error } = await CN.sb.from("tenant_modules").upsert({
       tenant_id: tenantId,
       module_key: key,
@@ -2924,14 +3067,20 @@
       row.className = "pe-staff-item";
       const input = document.createElement("input");
       input.type = "checkbox";
-      input.checked = state.modules[mod.key] !== false;
-      input.addEventListener("change", (ev) => {
-        updateModule(mod.key, ev.target.checked)
-          .then(() => toast("Module updated.", "ok"))
-          .catch((e) => toast(e.message || String(e), "error"));
-      });
+      const isLocked = mod.key === "modules";
+      input.checked = isLocked ? true : state.modules[mod.key] !== false;
+      if (isLocked) {
+        input.disabled = true;
+        input.title = "Required";
+      } else {
+        input.addEventListener("change", (ev) => {
+          updateModule(mod.key, ev.target.checked)
+            .then(() => toast("Module updated.", "ok"))
+            .catch((e) => toast(e.message || String(e), "error"));
+        });
+      }
       const label = document.createElement("div");
-      label.textContent = mod.label;
+      label.textContent = isLocked ? `${mod.label} (required)` : mod.label;
       row.appendChild(input);
       row.appendChild(label);
       els.modulesList.appendChild(row);
@@ -3161,11 +3310,13 @@
       });
     }
 
+    let baseDataError = null;
     try {
       await refreshBaseData();
     } catch (e) {
+      baseDataError = e;
+      console.error("Base data load failed:", e);
       toast(e.message || String(e), "error");
-      return;
     }
 
     populateScheduleStaffOptions();
@@ -3184,6 +3335,13 @@
     await refreshTimeline().catch(() => {});
     await refreshSchedule().catch(() => {});
     await refreshActivities().catch(() => {});
+
+    if (baseDataError && els.activitiesPanel) {
+      const msg = baseDataError.message || String(baseDataError);
+      if (!els.activitiesPanel.textContent.trim()) {
+        els.activitiesPanel.innerHTML = `<div class="empty-state"><div class="empty-state__msg">${msg}</div></div>`;
+      }
+    }
   }
 
   init();
