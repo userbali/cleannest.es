@@ -193,57 +193,81 @@
 <div id="adminTabInvoices" style="display:none;">
 <div class="portal-admin-head">
 <div>
-<h3 style="margin:0;">Monthly invoices</h3>
-<p class="section-sub" style="margin:6px 0 0;">Select a month → view counts &amp; totals per property. Export CSV for invoicing.</p>
-<div class="invoice-controls" id="invoiceControls">
-<input aria-label="Invoice month" class="input" id="invoiceMonth" type="month"/>
-<select aria-label="Invoice client" class="input" id="invoiceClient">
-<option value="">Client: All</option>
-</select>
-<button class="btn" id="invoiceDownloadCsv" type="button">⬇️ Download CSV</button>
+<h3 style="margin:0;">Invoices</h3>
+<p class="section-sub" style="margin:6px 0 0;">Create manual invoices and store them for printing or email. Numbers auto-increment per month.</p>
 </div>
-<div class="invoice-status" id="invoiceStatusBar" style="display:none; margin-top:10px;">
-<div class="invoice-status__main" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start; justify-content:space-between;">
-<div style="flex:1; min-width:280px;">
-<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-<span class="badge draft" id="invoiceStateBadge">draft</span>
-<span class="small-note" id="invoiceStatusText">—</span>
-<span class="small-note" id="invoiceSavedHint" style="display:none;">Saved ✓</span>
+<div style="display:flex; gap:8px; flex-wrap:wrap;">
+<button class="btn" id="invoiceSettingsBtn" type="button">Invoice settings</button>
+</div>
+</div>
+<div class="invoice-grid">
+<div class="card">
+<div class="card-h">New invoice</div>
+<div class="card-b">
+<div class="row-2">
+<input class="input" id="invoiceIssueDate" type="date"/>
+<input class="input" disabled="" id="invoiceNumber" placeholder="Auto number"/>
 </div>
 <div class="row-2" style="margin-top:10px;">
-<input class="input" id="invoiceSentTo" placeholder="Sent to email (optional)"/>
-<select aria-label="Payment method" class="input" id="invoicePaymentMethod">
-<option value="bank">Payment: Bank transfer</option>
-<option value="cash">Payment: Cash</option>
-<option value="card">Payment: Card</option>
-<option value="other">Payment: Other</option>
-</select>
+<input class="input" id="invoiceCustomerName" placeholder="Customer name"/>
+<input class="input" id="invoiceCustomerEmail" placeholder="Customer email (optional)" type="email"/>
 </div>
 <div class="row-2" style="margin-top:10px;">
-<input class="input" id="invoicePaymentLink" placeholder="Payment link (optional – future card payments)"/>
-<input class="input" id="invoicePaymentRef" placeholder="Payment reference (optional)"/>
+<input class="input" id="invoiceCustomerTaxId" placeholder="Tax ID (optional)"/>
+<input class="input" id="invoiceCustomerCountry" placeholder="Country (optional)"/>
 </div>
-<textarea class="input" id="invoiceInvoiceNote" placeholder="Invoice note (optional – appears in email)" rows="2" style="margin-top:10px; width:100%;"></textarea>
-<details style="margin-top:10px;">
-<summary class="small-note" style="cursor:pointer;">Bank details (used in invoice email)</summary>
-<textarea class="input" id="invoiceBillingText" placeholder="Example:
-Account holder: ...
-IBAN: ...
-Bank: ...
-SWIFT/BIC: ...
-Currency: EUR" rows="4" style="margin-top:10px; width:100%;"></textarea>
-</details>
+<textarea class="input" id="invoiceCustomerAddress" placeholder="Customer address (optional)" rows="3" style="margin-top:10px; width:100%;"></textarea>
+<div class="label" style="margin-top:12px;">Items</div>
+<div class="invoice-item-head">
+<span>Service / Concepto</span>
+<span>Qty / Cantidad</span>
+<span>Unit price / Precio unitario</span>
+<span>Total / Base imponible</span>
+<span></span>
 </div>
-<div id="invoiceStatusActions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start; justify-content:flex-end;">
-<button class="btn btn-primary" id="invoiceNextStatus" type="button">Set as Sent</button>
-<button class="btn" id="invoiceUndoStatus" type="button">Undo</button>
-<button class="btn" id="invoiceSendEmail" type="button">✉️ Send email</button>
-<button class="btn btn-danger" id="invoiceClearStatus" type="button">Reset</button>
+<div class="invoice-items" id="invoiceItems"></div>
+<div class="invoice-item-actions" style="margin-top:10px;">
+<button class="btn" id="invoiceAddItemBtn" type="button">+ Add item</button>
+</div>
+<div class="row-2" style="margin-top:10px;">
+<input class="input" disabled="" id="invoiceTotal" placeholder="Total (EUR)"/>
+</div>
+<div class="invoice-form-actions" style="margin-top:12px;">
+<button class="btn btn-primary" id="invoiceSaveBtn" type="button">Save invoice</button>
+<button class="btn" id="invoiceClearBtn" type="button">Clear</button>
 </div>
 </div>
 </div>
+<div class="card">
+<div class="card-h">Saved invoices</div>
+<div class="card-b">
+<div class="invoice-list" id="invoiceList"></div>
 </div>
-<div id="invoiceReport"></div>
+</div>
+</div>
+<div class="card invoice-preview" id="invoicePreview" style="display:none;"></div>
+<div class="invoice-print-area" id="invoicePrintArea"></div>
+<div class="cn-modal" hidden="" id="invoiceSettingsModal">
+<div class="cn-modal__overlay" data-action="invoice-settings-cancel"></div>
+<div aria-label="Invoice settings" aria-modal="true" class="cn-modal__panel" role="dialog">
+<div class="cn-modal__head">
+<div>
+<strong>Invoice settings</strong>
+<div class="small-note">Issuer details shown at the top of the invoice.</div>
+</div>
+<button class="btn" data-action="invoice-settings-cancel" type="button">Close</button>
+</div>
+<div class="form" style="margin-top:10px;">
+<div>
+<div class="label">Issuer details</div>
+<textarea class="input" id="invoiceIssuerText" placeholder="Company name&#10;Address&#10;Tax number&#10;Bank account" rows="5"></textarea>
+</div>
+<div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+<button class="btn" data-action="invoice-settings-cancel" type="button">Cancel</button>
+<button class="btn btn-primary" id="invoiceSettingsSave" type="button">Save</button>
+</div>
+</div>
+</div>
 </div>
 </div>
 <!-- ACTIVITIES -->

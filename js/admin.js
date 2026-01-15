@@ -26,6 +26,9 @@
     tasksCache: [],
     activityTypes: [],
     modules: {},
+    invoices: [],
+    selectedInvoiceId: null,
+    invoiceIssuerText: "",
     selectedPropertyId: null,
     activeTab: "properties",
     timeline: {
@@ -165,12 +168,25 @@
     auditDownloadCsv: $("auditDownloadCsv"),
     auditDownloadJson: $("auditDownloadJson"),
     auditLogHint: $("auditLogHint"),
-    invoiceReport: $("invoiceReport"),
-    invoiceDownloadCsv: $("invoiceDownloadCsv"),
-    invoiceNextStatus: $("invoiceNextStatus"),
-    invoiceUndoStatus: $("invoiceUndoStatus"),
-    invoiceSendEmail: $("invoiceSendEmail"),
-    invoiceClearStatus: $("invoiceClearStatus")
+    invoiceIssueDate: $("invoiceIssueDate"),
+    invoiceNumber: $("invoiceNumber"),
+    invoiceCustomerName: $("invoiceCustomerName"),
+    invoiceCustomerEmail: $("invoiceCustomerEmail"),
+    invoiceCustomerTaxId: $("invoiceCustomerTaxId"),
+    invoiceCustomerCountry: $("invoiceCustomerCountry"),
+    invoiceCustomerAddress: $("invoiceCustomerAddress"),
+    invoiceTotal: $("invoiceTotal"),
+    invoiceItems: $("invoiceItems"),
+    invoiceAddItemBtn: $("invoiceAddItemBtn"),
+    invoiceSaveBtn: $("invoiceSaveBtn"),
+    invoiceClearBtn: $("invoiceClearBtn"),
+    invoiceList: $("invoiceList"),
+    invoicePreview: $("invoicePreview"),
+    invoicePrintArea: $("invoicePrintArea"),
+    invoiceSettingsBtn: $("invoiceSettingsBtn"),
+    invoiceSettingsModal: $("invoiceSettingsModal"),
+    invoiceIssuerText: $("invoiceIssuerText"),
+    invoiceSettingsSave: $("invoiceSettingsSave")
   };
 
   function pad2(n) {
@@ -2425,6 +2441,693 @@
     }
   }
 
+  function formatCurrency(value) {
+    return `EUR ${formatAmount(value)}`;
+  }
+
+  async function loadInvoiceSettings() {
+    const { data, error } = await CN.sb
+      .from("tenant_settings")
+      .select("billing_text")
+      .eq("tenant_id", tenantId);
+    if (error) throw error;
+    const row = data && data[0];
+    state.invoiceIssuerText = row && row.billing_text ? String(row.billing_text) : "";
+  }
+
+  function openInvoiceSettingsModal() {
+    if (!els.invoiceSettingsModal) return;
+    if (els.invoiceIssuerText) els.invoiceIssuerText.value = state.invoiceIssuerText || "";
+    els.invoiceSettingsModal.removeAttribute("hidden");
+  }
+
+  function closeInvoiceSettingsModal() {
+    if (els.invoiceSettingsModal) els.invoiceSettingsModal.setAttribute("hidden", "");
+  }
+
+  async function saveInvoiceSettings() {
+    const text = els.invoiceIssuerText ? els.invoiceIssuerText.value.trim() : "";
+    const { error } = await CN.sb.from("tenant_settings").upsert({
+      tenant_id: tenantId,
+      billing_text: text,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "tenant_id" });
+    if (error) throw error;
+    state.invoiceIssuerText = text;
+  }
+
+  function parseInvoiceCustomerMeta(rawAddress) {
+    const meta = { address: "", taxId: "", country: "" };
+    if (!rawAddress) return meta;
+    if (typeof rawAddress !== "string") {
+      meta.address = String(rawAddress);
+      return meta;
+    }
+    const trimmed = rawAddress.trim();
+    if (!trimmed) return meta;
+    if (!trimmed.startsWith("{")) {
+      meta.address = rawAddress;
+      return meta;
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === "object") {
+        const hasMeta = Object.prototype.hasOwnProperty.call(parsed, "address")
+          || Object.prototype.hasOwnProperty.call(parsed, "tax_id")
+          || Object.prototype.hasOwnProperty.call(parsed, "taxId")
+          || Object.prototype.hasOwnProperty.call(parsed, "country");
+        if (hasMeta) {
+          if (typeof parsed.address === "string") meta.address = parsed.address;
+          if (typeof parsed.tax_id === "string") meta.taxId = parsed.tax_id;
+          if (typeof parsed.taxId === "string") meta.taxId = parsed.taxId;
+          if (typeof parsed.country === "string") meta.country = parsed.country;
+          return meta;
+        }
+      }
+    } catch (e) {
+      // fall through
+    }
+    meta.address = rawAddress;
+    return meta;
+  }
+
+  function packInvoiceCustomerAddress(address, taxId, country) {
+    const safeAddress = address || "";
+    const safeTaxId = taxId || "";
+    const safeCountry = country || "";
+    if (!safeTaxId && !safeCountry) {
+      return safeAddress || null;
+    }
+    return JSON.stringify({
+      address: safeAddress,
+      tax_id: safeTaxId,
+      country: safeCountry
+    });
+  }
+
+  function getInvoiceCustomerFields(invoice) {
+    const meta = parseInvoiceCustomerMeta(invoice ? invoice.customer_address : "");
+    return {
+      name: invoice && invoice.customer_name ? invoice.customer_name : "",
+      email: invoice && invoice.customer_email ? invoice.customer_email : "",
+      address: meta.address || "",
+      taxId: meta.taxId || "",
+      country: meta.country || ""
+    };
+  }
+
+  function getInvoiceItemRows() {
+    if (!els.invoiceItems) return [];
+    return Array.from(els.invoiceItems.querySelectorAll(".invoice-item-row"));
+  }
+
+  function addInvoiceItemRow(item = {}) {
+    if (!els.invoiceItems) return;
+    const row = document.createElement("div");
+    row.className = "invoice-item-row";
+
+    const service = document.createElement("input");
+    service.className = "input invoice-item-service";
+    service.placeholder = "Service / Concepto";
+    service.value = item.label || "";
+
+    const qty = document.createElement("input");
+    qty.className = "input invoice-item-qty";
+    qty.type = "number";
+    qty.min = "1";
+    qty.step = "1";
+    qty.placeholder = "Qty / Cantidad";
+    qty.value = item.qty != null ? String(item.qty) : "1";
+
+    const unit = document.createElement("input");
+    unit.className = "input invoice-item-unit";
+    unit.type = "number";
+    unit.min = "0";
+    unit.step = "0.01";
+    unit.placeholder = "Unit price / Precio unitario";
+    if (item.unit_price != null) unit.value = String(item.unit_price);
+
+    const total = document.createElement("input");
+    total.className = "input invoice-item-total";
+    total.type = "text";
+    total.disabled = true;
+    total.placeholder = "Total / Base imponible";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "btn invoice-item-remove";
+    removeBtn.type = "button";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      const rows = getInvoiceItemRows();
+      if (rows.length <= 1) {
+        service.value = "";
+        qty.value = "1";
+        unit.value = "";
+        total.value = "";
+      } else {
+        row.remove();
+      }
+      updateInvoiceTotal();
+    });
+
+    qty.addEventListener("input", updateInvoiceTotal);
+    unit.addEventListener("input", updateInvoiceTotal);
+
+    row.appendChild(service);
+    row.appendChild(qty);
+    row.appendChild(unit);
+    row.appendChild(total);
+    row.appendChild(removeBtn);
+    els.invoiceItems.appendChild(row);
+    updateInvoiceTotal();
+  }
+
+  function resetInvoiceItems() {
+    if (!els.invoiceItems) return;
+    els.invoiceItems.innerHTML = "";
+    addInvoiceItemRow();
+  }
+
+  function collectInvoiceItems() {
+    const rows = getInvoiceItemRows();
+    const items = [];
+    let hasPartial = false;
+    rows.forEach((row) => {
+      const service = (row.querySelector(".invoice-item-service") || {}).value || "";
+      const qtyRaw = (row.querySelector(".invoice-item-qty") || {}).value || "";
+      const unitRaw = (row.querySelector(".invoice-item-unit") || {}).value || "";
+      const hasAny = service.trim() || qtyRaw.trim() || unitRaw.trim();
+      if (!hasAny) return;
+
+      const qtyParsed = parseAmount(qtyRaw);
+      const qty = Number.isFinite(qtyParsed) ? qtyParsed : 1;
+      const unit = parseAmount(unitRaw);
+      if (!service.trim() || !Number.isFinite(unit) || unit <= 0 || !Number.isFinite(qty) || qty <= 0) {
+        hasPartial = true;
+        return;
+      }
+      items.push({
+        label: service.trim(),
+        qty,
+        unit_price: unit,
+        line_total: qty * unit
+      });
+    });
+    if (hasPartial) {
+      throw new Error("Please complete all item fields.");
+    }
+    return items;
+  }
+
+  function updateInvoiceTotal() {
+    if (!els.invoiceTotal || !els.invoiceItems) return;
+    let totalSum = 0;
+    getInvoiceItemRows().forEach((row) => {
+      const qtyInput = row.querySelector(".invoice-item-qty");
+      const unitInput = row.querySelector(".invoice-item-unit");
+      const totalInput = row.querySelector(".invoice-item-total");
+      const qtyRaw = qtyInput ? qtyInput.value : "";
+      const unitRaw = unitInput ? unitInput.value : "";
+      const qtyParsed = parseAmount(qtyRaw);
+      const qty = Number.isFinite(qtyParsed) ? qtyParsed : 1;
+      const unitPrice = parseAmount(unitRaw);
+      const lineTotal = Number.isFinite(unitPrice) && Number.isFinite(qty) && qty > 0 && unitPrice > 0
+        ? qty * unitPrice
+        : null;
+      if (totalInput) totalInput.value = lineTotal != null ? formatAmount(lineTotal) : "";
+      if (lineTotal != null && Number.isFinite(lineTotal)) totalSum += lineTotal;
+    });
+    els.invoiceTotal.value = totalSum ? formatAmount(totalSum) : "";
+  }
+
+  function clearInvoiceForm() {
+    if (els.invoiceIssueDate) els.invoiceIssueDate.value = toDateInputValue(new Date());
+    if (els.invoiceNumber) els.invoiceNumber.value = "Auto";
+    if (els.invoiceCustomerName) els.invoiceCustomerName.value = "";
+    if (els.invoiceCustomerEmail) els.invoiceCustomerEmail.value = "";
+    if (els.invoiceCustomerTaxId) els.invoiceCustomerTaxId.value = "";
+    if (els.invoiceCustomerCountry) els.invoiceCustomerCountry.value = "";
+    if (els.invoiceCustomerAddress) els.invoiceCustomerAddress.value = "";
+    if (els.invoiceTotal) els.invoiceTotal.value = "";
+    resetInvoiceItems();
+  }
+
+  function wireInvoiceControls() {
+    if (els.invoiceIssueDate && !els.invoiceIssueDate.value) {
+      els.invoiceIssueDate.value = toDateInputValue(new Date());
+    }
+    if (els.invoiceSaveBtn) {
+      els.invoiceSaveBtn.addEventListener("click", () => {
+        createInvoice().catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (els.invoiceClearBtn) {
+      els.invoiceClearBtn.addEventListener("click", clearInvoiceForm);
+    }
+    if (els.invoiceAddItemBtn) {
+      els.invoiceAddItemBtn.addEventListener("click", () => {
+        addInvoiceItemRow();
+        const rows = getInvoiceItemRows();
+        const lastRow = rows[rows.length - 1];
+        const serviceInput = lastRow ? lastRow.querySelector(".invoice-item-service") : null;
+        if (serviceInput) serviceInput.focus();
+      });
+    }
+    if (els.invoiceSettingsBtn) {
+      els.invoiceSettingsBtn.addEventListener("click", openInvoiceSettingsModal);
+    }
+    if (els.invoiceSettingsModal) {
+      els.invoiceSettingsModal.addEventListener("click", (ev) => {
+        if (ev.target && ev.target.dataset && ev.target.dataset.action === "invoice-settings-cancel") {
+          closeInvoiceSettingsModal();
+        }
+      });
+    }
+    if (els.invoiceSettingsSave) {
+      els.invoiceSettingsSave.addEventListener("click", () => {
+        saveInvoiceSettings()
+          .then(() => {
+            toast("Invoice settings saved.", "ok");
+            closeInvoiceSettingsModal();
+            const invoice = state.invoices.find((inv) => inv.id === state.selectedInvoiceId);
+            renderInvoicePreview(invoice || null);
+          })
+          .catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+  }
+
+  async function getNextInvoiceNumber(issueDate) {
+    const { data, error } = await CN.sb.rpc("next_invoice_number", {
+      p_tenant_id: tenantId,
+      p_issue_date: issueDate
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function loadInvoices() {
+    const { data, error } = await CN.sb
+      .from("invoices")
+      .select("id, invoice_number, issue_date, total, currency, customer_name, customer_email, customer_address, invoice_items(id, label, qty, unit_price, line_total, notes)")
+      .eq("tenant_id", tenantId)
+      .order("issue_date", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  function buildInvoiceContent(invoice) {
+    const doc = document.createElement("div");
+    doc.className = "invoice-doc";
+
+    const header = document.createElement("div");
+    header.className = "invoice-doc__header";
+
+    const logoWrap = document.createElement("div");
+    logoWrap.className = "invoice-doc__logo";
+    const logo = document.createElement("img");
+    logo.alt = "Clean-Nest logo";
+    logo.src = "pics/logo.png";
+    const logoText = document.createElement("div");
+    logoText.className = "invoice-doc__logo-text";
+    logoText.textContent = "Clean-Nest";
+    logoWrap.appendChild(logo);
+    logoWrap.appendChild(logoText);
+
+    const title = document.createElement("div");
+    title.className = "invoice-doc__header-title";
+    title.textContent = "FACTURA";
+
+    const number = document.createElement("div");
+    number.className = "invoice-doc__header-number";
+    const numberValue = document.createElement("div");
+    numberValue.className = "invoice-doc__header-number-value";
+    numberValue.textContent = invoice.invoice_number || "";
+    const numberMeta = document.createElement("div");
+    numberMeta.className = "invoice-doc__header-number-meta";
+    const issueDate = document.createElement("div");
+    issueDate.textContent = `Issue date: ${invoice.issue_date || ""}`;
+    const currency = document.createElement("div");
+    currency.textContent = `Currency: ${invoice.currency || "EUR"}`;
+    numberMeta.appendChild(issueDate);
+    numberMeta.appendChild(currency);
+    number.appendChild(numberValue);
+    number.appendChild(numberMeta);
+
+    header.appendChild(logoWrap);
+    header.appendChild(title);
+    header.appendChild(number);
+    doc.appendChild(header);
+
+    const issuerText = (state.invoiceIssuerText || "").trim();
+    if (issuerText) {
+      const issuerBlock = document.createElement("div");
+      issuerBlock.className = "invoice-doc__block";
+      const issuerLabel = document.createElement("div");
+      issuerLabel.className = "label";
+      issuerLabel.textContent = "Issuer";
+      const issuerBody = document.createElement("div");
+      issuerBody.className = "invoice-doc__text";
+      issuerBody.textContent = issuerText;
+      issuerBlock.appendChild(issuerLabel);
+      issuerBlock.appendChild(issuerBody);
+      doc.appendChild(issuerBlock);
+    }
+
+    const customerBlock = document.createElement("div");
+    customerBlock.className = "invoice-doc__block";
+    const customerLabel = document.createElement("div");
+    customerLabel.className = "label";
+    customerLabel.textContent = "Customer";
+    const customerSubLabel = document.createElement("div");
+    customerSubLabel.className = "invoice-doc__sub-label";
+    customerSubLabel.textContent = "Cliente (destinatario)";
+    const customer = getInvoiceCustomerFields(invoice);
+    customerBlock.appendChild(customerLabel);
+    customerBlock.appendChild(customerSubLabel);
+
+    const customerFields = document.createElement("div");
+    customerFields.className = "invoice-doc__fields";
+
+    const appendCustomerField = (labelText, subLabelText, valueText) => {
+      const field = document.createElement("div");
+      field.className = "invoice-doc__field";
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = labelText;
+      field.appendChild(label);
+      if (subLabelText) {
+        const subLabel = document.createElement("div");
+        subLabel.className = "invoice-doc__sub-label";
+        subLabel.textContent = subLabelText;
+        field.appendChild(subLabel);
+      }
+      const value = document.createElement("div");
+      value.className = "invoice-doc__field-value";
+      value.textContent = valueText || "";
+      field.appendChild(value);
+      customerFields.appendChild(field);
+    };
+
+    appendCustomerField("Name / Company", "Nombre y apellidos / Razon social:", customer.name);
+    appendCustomerField("TAX ID/NIE/NIF/CIF:", "", customer.taxId);
+    appendCustomerField("Address/Domicilio:", "", customer.address);
+    appendCustomerField("Country/Pais:", "", customer.country);
+
+    customerBlock.appendChild(customerFields);
+    doc.appendChild(customerBlock);
+
+    const table = document.createElement("div");
+    table.className = "invoice-doc__table";
+    const head = document.createElement("div");
+    head.className = "invoice-doc__row head";
+    ["Service / Concepto", "Qty / Cantidad", "Unit price / Precio unitario", "Total / Base imponible"].forEach((label) => {
+      const cell = document.createElement("div");
+      cell.textContent = label;
+      head.appendChild(cell);
+    });
+    table.appendChild(head);
+
+    const items = Array.isArray(invoice.invoice_items) ? invoice.invoice_items.slice() : [];
+    if (!items.length) {
+      items.push({
+        label: "",
+        qty: 1,
+        unit_price: null,
+        line_total: invoice.total
+      });
+    }
+    items.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "invoice-doc__row";
+      const service = document.createElement("div");
+      service.textContent = item && item.label ? item.label : "";
+      const qty = document.createElement("div");
+      qty.textContent = item && item.qty != null ? String(item.qty) : "1";
+      const unit = document.createElement("div");
+      unit.textContent = item && item.unit_price != null ? formatCurrency(item.unit_price) : "";
+      const line = document.createElement("div");
+      const lineTotal = item && item.line_total != null ? item.line_total : null;
+      line.textContent = lineTotal != null ? formatCurrency(lineTotal) : "";
+      row.appendChild(service);
+      row.appendChild(qty);
+      row.appendChild(unit);
+      row.appendChild(line);
+      table.appendChild(row);
+    });
+    doc.appendChild(table);
+
+    const total = document.createElement("div");
+    total.className = "invoice-doc__total";
+    const totalValue = Number.isFinite(Number(invoice.total))
+      ? Number(invoice.total)
+      : items.reduce((sum, item) => sum + (Number(item.line_total) || 0), 0);
+    total.textContent = `Total: ${formatCurrency(totalValue || 0)}`;
+    doc.appendChild(total);
+
+    const note = document.createElement("div");
+    note.className = "invoice-doc__note";
+    note.textContent = "EXENTO DE IGIC POR FRANQUICIA FISCAL";
+    doc.appendChild(note);
+
+    return doc;
+  }
+
+  function renderInvoicePreview(invoice) {
+    if (!els.invoicePreview) return;
+    if (!invoice) {
+      els.invoicePreview.style.display = "none";
+      els.invoicePreview.innerHTML = "";
+      if (els.invoicePrintArea) els.invoicePrintArea.innerHTML = "";
+      return;
+    }
+    els.invoicePreview.style.display = "block";
+    els.invoicePreview.innerHTML = "";
+
+    const head = document.createElement("div");
+    head.className = "invoice-preview__head";
+    const left = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = invoice.invoice_number || "Invoice";
+    const meta = document.createElement("div");
+    meta.className = "small-note";
+    meta.textContent = invoice.issue_date || "";
+    left.appendChild(title);
+    left.appendChild(meta);
+    head.appendChild(left);
+
+    const actions = document.createElement("div");
+    actions.className = "invoice-preview__actions";
+    const printBtn = document.createElement("button");
+    printBtn.className = "btn";
+    printBtn.type = "button";
+    printBtn.textContent = "Print";
+    printBtn.addEventListener("click", () => {
+      printInvoice(invoice);
+    });
+    const emailBtn = document.createElement("button");
+    emailBtn.className = "btn";
+    emailBtn.type = "button";
+    emailBtn.textContent = "Email";
+    emailBtn.addEventListener("click", () => {
+      emailInvoice(invoice);
+    });
+    actions.appendChild(printBtn);
+    actions.appendChild(emailBtn);
+    head.appendChild(actions);
+    els.invoicePreview.appendChild(head);
+    els.invoicePreview.appendChild(buildInvoiceContent(invoice));
+  }
+
+  function renderInvoicePrintArea(invoice) {
+    if (!els.invoicePrintArea) return;
+    els.invoicePrintArea.innerHTML = "";
+    els.invoicePrintArea.appendChild(buildInvoiceContent(invoice));
+  }
+
+  function printInvoice(invoice) {
+    if (!els.invoicePrintArea) return;
+    renderInvoicePrintArea(invoice);
+
+    const originalTitle = document.title;
+    const originalParent = els.invoicePrintArea.parentNode;
+    const originalNext = els.invoicePrintArea.nextSibling;
+
+    const cleanup = () => {
+      document.body.classList.remove("is-printing-invoice");
+      document.title = originalTitle;
+      if (originalParent) {
+        if (originalNext && originalNext.parentNode === originalParent) {
+          originalParent.insertBefore(els.invoicePrintArea, originalNext);
+        } else {
+          originalParent.appendChild(els.invoicePrintArea);
+        }
+      }
+      window.removeEventListener("afterprint", cleanup);
+    };
+
+    document.body.classList.add("is-printing-invoice");
+    document.title = "";
+    document.body.appendChild(els.invoicePrintArea);
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+  }
+
+  function renderInvoiceList() {
+    if (!els.invoiceList) return;
+    els.invoiceList.innerHTML = "";
+    if (!state.invoices.length) {
+      els.invoiceList.innerHTML = '<div class="empty-state"><div class="empty-state__msg">No invoices yet.</div></div>';
+      return;
+    }
+    state.invoices.forEach((invoice) => {
+      const row = document.createElement("div");
+      row.className = "invoice-list-row";
+      if (state.selectedInvoiceId === invoice.id) row.classList.add("is-active");
+
+      const main = document.createElement("div");
+      main.className = "invoice-list-row__main";
+      const title = document.createElement("div");
+      title.className = "invoice-list-row__title";
+      title.textContent = invoice.invoice_number || "Invoice";
+      const meta = document.createElement("div");
+      meta.className = "invoice-list-row__meta";
+      meta.textContent = [invoice.customer_name, invoice.issue_date].filter(Boolean).join(" • ");
+      main.appendChild(title);
+      main.appendChild(meta);
+
+      const total = document.createElement("div");
+      total.className = "invoice-list-row__total";
+      total.textContent = formatCurrency(invoice.total || 0);
+
+      row.appendChild(main);
+      row.appendChild(total);
+      row.addEventListener("click", () => {
+        selectInvoice(invoice.id);
+      });
+      els.invoiceList.appendChild(row);
+    });
+  }
+
+  function selectInvoice(id) {
+    state.selectedInvoiceId = id;
+    const invoice = state.invoices.find((inv) => inv.id === id);
+    renderInvoicePreview(invoice || null);
+    renderInvoiceList();
+  }
+
+  async function refreshInvoices() {
+    try {
+      state.invoices = await loadInvoices();
+      renderInvoiceList();
+      if (state.selectedInvoiceId) {
+        const invoice = state.invoices.find((inv) => inv.id === state.selectedInvoiceId);
+        renderInvoicePreview(invoice || null);
+      } else if (state.invoices[0]) {
+        selectInvoice(state.invoices[0].id);
+      }
+    } catch (e) {
+      if (els.invoiceList) {
+        els.invoiceList.innerHTML = `<div class="empty-state"><div class="empty-state__msg">${e.message || String(e)}</div></div>`;
+      }
+    }
+  }
+
+  function buildInvoiceEmailBody(invoice) {
+    const items = Array.isArray(invoice.invoice_items) ? invoice.invoice_items : [];
+    const lines = [];
+    lines.push(`Invoice ${invoice.invoice_number || ""}`);
+    lines.push(`Issue date: ${invoice.issue_date || ""}`);
+    lines.push("");
+    lines.push("Customer:");
+    const customer = getInvoiceCustomerFields(invoice);
+    lines.push(`Name / company nombre y apellidos / razon social: ${customer.name}`);
+    lines.push(`TAX ID/NIE/NIF/CIF: ${customer.taxId}`);
+    lines.push(`Address/Domicilio: ${customer.address}`);
+    lines.push(`Country/Pais: ${customer.country}`);
+    if (customer.email) lines.push(`Email: ${customer.email}`);
+    lines.push("");
+    lines.push("Service:");
+    if (items.length) {
+      items.forEach((item) => {
+        lines.push(`${item.label} | Qty: ${item.qty} | Unit price: ${formatCurrency(item.unit_price)} | Line total: ${formatCurrency(item.line_total)}`);
+      });
+    }
+    lines.push("");
+    lines.push(`Total: ${formatCurrency(invoice.total || 0)}`);
+    return lines.join("\n");
+  }
+
+  function emailInvoice(invoice) {
+    const email = invoice.customer_email || "";
+    if (!email) {
+      toast("Customer email is missing.", "error");
+      return;
+    }
+    const subject = encodeURIComponent(`Invoice ${invoice.invoice_number || ""}`);
+    const body = encodeURIComponent(buildInvoiceEmailBody(invoice));
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+  }
+
+  async function createInvoice() {
+    const issueDate = els.invoiceIssueDate ? (els.invoiceIssueDate.value || toDateInputValue(new Date())) : toDateInputValue(new Date());
+    const customerName = els.invoiceCustomerName ? els.invoiceCustomerName.value.trim() : "";
+    const customerEmail = els.invoiceCustomerEmail ? els.invoiceCustomerEmail.value.trim() : "";
+    const customerTaxId = els.invoiceCustomerTaxId ? els.invoiceCustomerTaxId.value.trim() : "";
+    const customerCountry = els.invoiceCustomerCountry ? els.invoiceCustomerCountry.value.trim() : "";
+    const customerAddress = els.invoiceCustomerAddress ? els.invoiceCustomerAddress.value.trim() : "";
+    let items = [];
+    try {
+      items = collectInvoiceItems();
+    } catch (e) {
+      toast(e.message || String(e), "error");
+      return;
+    }
+
+    if (!customerName) {
+      toast("Customer name is required.", "error");
+      return;
+    }
+    if (!items.length) {
+      toast("Add at least one item.", "error");
+      return;
+    }
+
+    const invoiceTotal = items.reduce((sum, item) => sum + (Number(item.line_total) || 0), 0);
+    const customerAddressPayload = packInvoiceCustomerAddress(customerAddress, customerTaxId, customerCountry);
+    const invoiceNumber = await getNextInvoiceNumber(issueDate);
+    const { data: invoice, error } = await CN.sb.from("invoices").insert({
+      tenant_id: tenantId,
+      owner_user_id: userId,
+      property_id: null,
+      status: "draft",
+      issue_date: issueDate,
+      total: invoiceTotal,
+      currency: "EUR",
+      invoice_number: invoiceNumber,
+      customer_name: customerName,
+      customer_email: customerEmail || null,
+      customer_address: customerAddressPayload
+    }).select("id").single();
+    if (error) throw error;
+
+    const itemsPayload = items.map((item) => ({
+      tenant_id: tenantId,
+      invoice_id: invoice.id,
+      label: item.label,
+      qty: item.qty,
+      unit_price: item.unit_price,
+      line_total: item.line_total
+    }));
+    const { error: itemError } = await CN.sb.from("invoice_items").insert(itemsPayload);
+    if (itemError) throw itemError;
+
+    toast("Invoice saved.", "ok");
+    clearInvoiceForm();
+    await refreshInvoices();
+    selectInvoice(invoice.id);
+  }
+
   async function refreshTaskViews() {
     await loadTasksCache();
     renderClientsList();
@@ -3007,6 +3710,9 @@
     if (tabKey === "timeline") {
       refreshTimeline().catch((e) => toast(e.message || String(e), "error"));
     }
+    if (tabKey === "invoices") {
+      refreshInvoices().catch((e) => toast(e.message || String(e), "error"));
+    }
   }
 
   function wireTabs() {
@@ -3265,20 +3971,10 @@
       els.storageRefreshBtn,
       els.storageCleanupBtn,
       els.auditDownloadCsv,
-      els.auditDownloadJson,
-      els.invoiceDownloadCsv,
-      els.invoiceNextStatus,
-      els.invoiceUndoStatus,
-      els.invoiceSendEmail,
-      els.invoiceClearStatus
+      els.auditDownloadJson
     ].forEach((btn) => {
       if (btn) btn.addEventListener("click", notReady);
     });
-  }
-
-  function renderInvoicesPlaceholder() {
-    if (!els.invoiceReport) return;
-    els.invoiceReport.innerHTML = '<div class="empty-state"><div class="empty-state__msg">Invoices will be enabled after payment integration.</div></div>';
   }
 
   async function init() {
@@ -3299,6 +3995,7 @@
     wireTimelineControls();
     wireScheduleControls();
     wireActivitiesControls();
+    wireInvoiceControls();
 
     if (els.adminSearch) els.adminSearch.addEventListener("input", renderClientsList);
     if (els.filterActiveSession) els.filterActiveSession.addEventListener("change", renderClientsList);
@@ -3319,14 +4016,22 @@
       toast(e.message || String(e), "error");
     }
 
+    try {
+      await loadInvoiceSettings();
+    } catch (e) {
+      state.invoiceIssuerText = "";
+      toast(e.message || String(e), "error");
+    }
+
     populateScheduleStaffOptions();
     populateActivityTypeSelect();
     renderAdminToolSelects();
 
     renderClientsList();
     renderPropertyDetail(null);
+    clearInvoiceForm();
     renderModulesList();
-    renderInvoicesPlaceholder();
+    await refreshInvoices();
 
     const firstEnabled = MODULE_DEFS.find((m) => state.modules[m.key] !== false);
     setActiveTab(firstEnabled ? firstEnabled.key : "properties");
