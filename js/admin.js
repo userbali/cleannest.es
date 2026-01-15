@@ -2932,8 +2932,16 @@
     emailBtn.addEventListener("click", () => {
       emailInvoice(invoice);
     });
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn btn-danger";
+    deleteBtn.type = "button";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => {
+      deleteInvoice(invoice).catch((e) => toast(e.message || String(e), "error"));
+    });
     actions.appendChild(printBtn);
     actions.appendChild(emailBtn);
+    actions.appendChild(deleteBtn);
     head.appendChild(actions);
     els.invoicePreview.appendChild(head);
     els.invoicePreview.appendChild(buildInvoiceContent(invoice));
@@ -3067,6 +3075,17 @@
     const subject = encodeURIComponent(`Invoice ${invoice.invoice_number || ""}`);
     const body = encodeURIComponent(buildInvoiceEmailBody(invoice));
     window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+  }
+
+  async function deleteInvoice(invoice) {
+    if (!invoice || !invoice.id) return;
+    const ok = window.confirm("Delete this invoice? This cannot be undone.");
+    if (!ok) return;
+    const { error } = await CN.sb.from("invoices").delete().eq("id", invoice.id);
+    if (error) throw error;
+    state.selectedInvoiceId = null;
+    toast("Invoice deleted.", "ok");
+    await refreshInvoices();
   }
 
   async function createInvoice() {
