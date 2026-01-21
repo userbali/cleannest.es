@@ -107,6 +107,30 @@
     });
   }
 
+  function renderChecklist(container, items) {
+    if (!container) return;
+    container.innerHTML = "";
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) return;
+    const box = document.createElement("div");
+    box.className = "checklist";
+    list.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "check-item";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.disabled = true;
+      input.checked = Boolean(item.done);
+      const label = document.createElement("label");
+      label.textContent = item.label || "Checklist item";
+      if (item.done) label.classList.add("done");
+      row.appendChild(input);
+      row.appendChild(label);
+      box.appendChild(row);
+    });
+    container.appendChild(box);
+  }
+
   function renderGallery(container, items) {
     if (!container) return;
     container.innerHTML = "";
@@ -158,6 +182,24 @@
     return map;
   }
 
+  async function loadChecklists(taskIds) {
+    const map = new Map();
+    const ids = Array.isArray(taskIds) ? taskIds.filter(Boolean) : [];
+    if (!ids.length) return map;
+    const { data, error } = await CN.sb
+      .from("task_checklist_items")
+      .select("task_id, label, done, sort_order, created_at")
+      .in("task_id", ids)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    (data || []).forEach((row) => {
+      if (!map.has(row.task_id)) map.set(row.task_id, []);
+      map.get(row.task_id).push(row);
+    });
+    return map;
+  }
+
   async function loadUpcoming() {
     const today = toDateInputValue(new Date());
     const { data, error } = await CN.sb
@@ -192,6 +234,8 @@
     }
     const photosByTask = options && options.photosByTask ? options.photosByTask : null;
     const showPhotos = Boolean(options && options.showPhotos);
+    const checklistsByTask = options && options.checklistsByTask ? options.checklistsByTask : null;
+    const showChecklist = Boolean(options && options.showChecklist);
     const list = document.createElement("div");
     list.className = "booking-list";
     tasks.forEach((task) => {
@@ -245,6 +289,19 @@
         card.appendChild(details);
       }
 
+      if (showChecklist && checklistsByTask) {
+        const checklistItems = checklistsByTask.get(task.id) || [];
+        if (checklistItems.length) {
+          const checklistLabel = document.createElement("div");
+          checklistLabel.className = "label";
+          checklistLabel.textContent = "Checklist";
+          card.appendChild(checklistLabel);
+          const checklistWrap = document.createElement("div");
+          renderChecklist(checklistWrap, checklistItems);
+          card.appendChild(checklistWrap);
+        }
+      }
+
       if (showPhotos && photosByTask) {
         const photos = photosByTask.get(task.id) || [];
         if (photos.length) {
@@ -263,13 +320,17 @@
     try {
       const [upcoming, history] = await Promise.all([loadUpcoming(), loadHistory()]);
       const photoIds = new Set();
+      const checklistIds = new Set();
       history.forEach((task) => photoIds.add(task.id));
       upcoming.forEach((task) => {
         if (task.status === "in_progress") photoIds.add(task.id);
+        checklistIds.add(task.id);
       });
+      history.forEach((task) => checklistIds.add(task.id));
       const photosByTask = await loadTaskPhotos(Array.from(photoIds));
-      renderList(upcomingEl, upcoming, "No upcoming cleanings.", { photosByTask, showPhotos: true });
-      renderList(historyEl, history, "No history yet.", { photosByTask, showPhotos: true, useCompletedAt: true });
+      const checklistsByTask = await loadChecklists(Array.from(checklistIds));
+      renderList(upcomingEl, upcoming, "No upcoming cleanings.", { photosByTask, showPhotos: true, checklistsByTask, showChecklist: true });
+      renderList(historyEl, history, "No history yet.", { photosByTask, showPhotos: true, checklistsByTask, showChecklist: true, useCompletedAt: true });
     } catch (e) {
       toast(e.message || String(e), "error");
     }
