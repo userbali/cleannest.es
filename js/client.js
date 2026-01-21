@@ -65,6 +65,14 @@
     return task && task.day_date ? task.day_date : "";
   }
 
+  function formatCompletedStamp(ts) {
+    if (!ts) return "";
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "";
+    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${toDateInputValue(d)} ${time}`;
+  }
+
   function statusBadge(status) {
     if (status === "in_progress") return { label: "In progress", className: "in_progress" };
     if (status === "done") return { label: "Completed", className: "completed" };
@@ -273,6 +281,15 @@
       badgeEl.className = `badge ${badge.className}`;
       badgeEl.textContent = badge.label;
       status.appendChild(badgeEl);
+      if (task.status === "done") {
+        const stamp = formatCompletedStamp(task.completed_at);
+        if (stamp) {
+          const stampEl = document.createElement("div");
+          stampEl.className = "small-muted";
+          stampEl.textContent = `Completed: ${stamp}`;
+          status.appendChild(stampEl);
+        }
+      }
 
       top.appendChild(when);
       top.appendChild(main);
