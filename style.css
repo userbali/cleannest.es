@@ -2761,7 +2761,14 @@ footer{
 .booking-date{font-weight:900;}
 .booking-main{flex:1;min-width:180px;}
 .booking-title{font-weight:900;margin-bottom:2px;}
-.booking-status{margin-left:auto;display:flex;align-items:flex-start;}
+.booking-status{
+  margin-left:auto;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:4px;
+  text-align:right;
+}
 .booking-actions{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;}
 .booking-details{margin-top:12px;padding-top:12px;border-top:1px solid var(--stroke);}
 .booking-notes{background:var(--surface2);border:1px dashed var(--stroke);border-radius:14px;padding:10px 12px;}

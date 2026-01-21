@@ -286,7 +286,7 @@
         if (stamp) {
           const stampEl = document.createElement("div");
           stampEl.className = "small-muted";
-          stampEl.textContent = `Completed: ${stamp}`;
+          stampEl.textContent = stamp;
           status.appendChild(stampEl);
         }
       }
