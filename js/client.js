@@ -57,6 +57,14 @@
     return startLabel;
   }
 
+  function getDisplayDate(task, options) {
+    if (options && options.useCompletedAt && task && task.completed_at) {
+      const d = new Date(task.completed_at);
+      if (!Number.isNaN(d.getTime())) return toDateInputValue(d);
+    }
+    return task && task.day_date ? task.day_date : "";
+  }
+
   function statusBadge(status) {
     if (status === "in_progress") return { label: "In progress", className: "in_progress" };
     if (status === "done") return { label: "Completed", className: "completed" };
@@ -156,18 +164,19 @@
       .from("tasks")
       .select("id, day_date, status, duration_minutes, start_at, end_at, notes, property:properties(address), label:task_labels(name)")
       .gte("day_date", today)
+      .neq("status", "done")
+      .neq("status", "canceled")
       .order("day_date", { ascending: true });
     if (error) throw error;
     return data || [];
   }
 
   async function loadHistory() {
-    const today = toDateInputValue(new Date());
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, property:properties(address), label:task_labels(name)")
-      .lt("day_date", today)
+      .select("id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, property:properties(address), label:task_labels(name)")
       .eq("status", "done")
+      .order("completed_at", { ascending: false, nullsFirst: false })
       .order("day_date", { ascending: false })
       .limit(50);
     if (error) throw error;
@@ -195,7 +204,7 @@
       when.className = "booking-when";
       const dateEl = document.createElement("div");
       dateEl.className = "booking-date";
-      dateEl.textContent = task.day_date;
+      dateEl.textContent = getDisplayDate(task, options);
       const timeEl = document.createElement("div");
       timeEl.className = "small-muted";
       timeEl.textContent = fmtTimeRange(task.start_at, task.end_at, task.duration_minutes);
@@ -253,9 +262,14 @@
   async function refresh() {
     try {
       const [upcoming, history] = await Promise.all([loadUpcoming(), loadHistory()]);
-      const photosByTask = await loadTaskPhotos(history.map((task) => task.id));
-      renderList(upcomingEl, upcoming, "No upcoming cleanings.");
-      renderList(historyEl, history, "No history yet.", { photosByTask, showPhotos: true });
+      const photoIds = new Set();
+      history.forEach((task) => photoIds.add(task.id));
+      upcoming.forEach((task) => {
+        if (task.status === "in_progress") photoIds.add(task.id);
+      });
+      const photosByTask = await loadTaskPhotos(Array.from(photoIds));
+      renderList(upcomingEl, upcoming, "No upcoming cleanings.", { photosByTask, showPhotos: true });
+      renderList(historyEl, history, "No history yet.", { photosByTask, showPhotos: true, useCompletedAt: true });
     } catch (e) {
       toast(e.message || String(e), "error");
     }
