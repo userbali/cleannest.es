@@ -1734,22 +1734,22 @@ footer{
 
 .invoice-preview{
   margin-top: 14px;
-  background: #fff;
 }
 
 .invoice-preview,
 #invoicePrintArea,
 .invoice-print-area{
-  --surface: #fff;
-  --surface2: #fff;
-  --stroke: #E6EEF8;
-  --text: #0B1B2B;
-  --muted: #52657A;
-  --shadow2: 0 10px 30px rgba(11,27,43,.10);
-  --badge-bg: rgba(11,27,43,.04);
-  --badge-border: rgba(11,27,43,.12);
-  --table-head-bg: rgba(11,27,43,.03);
-  --table-head-text: rgba(11,27,43,.72);
+  --bg:#F6FAFF;
+  --surface:#FFFFFF;
+  --surface2:#F1F7FF;
+  --stroke:#E6EEF8;
+  --text:#0B1B2B;
+  --muted:#52657A;
+  --shadow2:0 10px 30px rgba(11,27,43,.10);
+  --badge-bg:rgba(11,27,43,.04);
+  --badge-border:rgba(11,27,43,.12);
+  --table-head-bg:rgba(11,27,43,.03);
+  --table-head-text:rgba(11,27,43,.72);
 }
 
 .invoice-preview__head{
@@ -1771,12 +1771,6 @@ footer{
   display:flex;
   flex-direction:column;
   gap:12px;
-}
-
-.invoice-preview .invoice-doc__block,
-.invoice-preview .invoice-doc__table,
-.invoice-preview .invoice-doc__row.head{
-  background: #fff;
 }
 
 .invoice-doc__header{
@@ -1926,35 +1920,8 @@ footer{
 }
 
 @media print{
-  *{
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
   body.is-printing-invoice > *:not(#invoicePrintArea){
     display:none !important;
-  }
-  body.is-printing-invoice{
-    color: #111;
-    background: #fff;
-  }
-  body.is-printing-invoice .invoice-doc,
-  body.is-printing-invoice .invoice-doc *{
-    box-shadow: none !important;
-  }
-  body.is-printing-invoice .invoice-doc__block,
-  body.is-printing-invoice .invoice-doc__table,
-  body.is-printing-invoice .invoice-doc__row.head{
-    background: transparent !important;
-  }
-  body.is-printing-invoice .invoice-doc__block,
-  body.is-printing-invoice .invoice-doc__table,
-  body.is-printing-invoice .invoice-doc__row{
-    border-color: #333;
-  }
-  body.is-printing-invoice .invoice-doc__meta,
-  body.is-printing-invoice .invoice-doc__header-number-meta,
-  body.is-printing-invoice .invoice-doc__note{
-    color: #444;
   }
   body.is-printing-invoice{
     margin: 0;
