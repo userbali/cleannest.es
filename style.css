@@ -1931,14 +1931,30 @@ footer{
 }
 
 
-.timeline-booking.is-done{ opacity: .70; }
+.timeline-booking.is-done{
+  opacity: 1;
+  background: rgba(51, 194, 107, .12);
+  border-color: rgba(26, 168, 90, .35);
+}
 .timeline-booking.is-cancelled{ opacity: .55; text-decoration: line-through; }
 
 .timeline-booking + .timeline-booking{ margin-top: 10px; }
 
 .timeline-booking__main{ min-width: 0; display:flex; flex-direction:column; gap:2px; }
-.timeline-booking__time-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.timeline-booking__time-row .badge{ margin-top: 0; }
+.timeline-booking__time-row{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.timeline-booking__status{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin: 0 auto;
+}
+.timeline-booking__status .badge{ margin-top: 0; }
 .timeline-booking__time{ font-weight: 900; font-size: 13px; }
 .timeline-booking__addr{ font-weight: 800; color: var(--text); overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timeline-booking__meta{ color: var(--muted); font-size: 12px; }
