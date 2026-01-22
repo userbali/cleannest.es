@@ -1750,6 +1750,9 @@ footer{
   --badge-border:rgba(11,27,43,.12);
   --table-head-bg:rgba(11,27,43,.03);
   --table-head-text:rgba(11,27,43,.72);
+  color: var(--text);
+  background: var(--surface);
+  color-scheme: light;
 }
 
 .invoice-preview__head{
