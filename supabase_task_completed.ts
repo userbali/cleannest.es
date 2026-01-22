@@ -121,23 +121,31 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
     const resendKey = Deno.env.get("RESEND_API_KEY") || "";
     const resendFrom = Deno.env.get("RESEND_FROM") || "info@cleannest.es";
 
-    if (!supabaseUrl || !serviceRole) {
+    if (!supabaseUrl || !serviceRole || !anonKey) {
       return jsonResponse({ error: "Missing Supabase environment." }, 500);
     }
 
     const authHeader = req.headers.get("Authorization") || "";
-    const supabase = createClient(supabaseUrl, serviceRole, {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) {
+    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (!jwt) {
       return jsonResponse({ error: "Unauthorized." }, 401);
     }
+    const supabaseAuth = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false },
+    });
+
+    const { data: authData, error: authError } = await supabaseAuth.auth.getUser(jwt);
+    if (authError || !authData?.user) {
+      return jsonResponse({ error: authError?.message || "Unauthorized." }, 401);
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRole, {
+      auth: { persistSession: false }
+    });
 
     const body = await req.json().catch(() => ({}));
     const taskId = body && body.task_id ? String(body.task_id) : "";
