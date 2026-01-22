@@ -467,8 +467,26 @@
     await staffCompleteTask(item.id);
     toast("Completed.", "ok");
     await refresh();
+    const workflow = await triggerTaskCompletionWorkflow(item.id);
+    if (workflow && workflow.email_sent) {
+      toast("Completion email sent.", "ok");
+    }
     if (taskDetail.modal && !taskDetail.modal.hasAttribute("hidden")) {
       await openTaskDetail(item.id);
+    }
+  }
+
+  async function triggerTaskCompletionWorkflow(taskId) {
+    if (!taskId || !CN.sb || !CN.sb.functions) return null;
+    try {
+      const { data, error } = await CN.sb.functions.invoke("task-completed", {
+        body: { task_id: taskId }
+      });
+      if (error) throw error;
+      return data || null;
+    } catch (e) {
+      toast(`Automation failed: ${e.message || String(e)}`, "error");
+      return null;
     }
   }
 

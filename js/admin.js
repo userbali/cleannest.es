@@ -1155,10 +1155,32 @@
     await updateTask(task.id, { status: "done", completed_at: new Date().toISOString() });
     toast("Task completed.", "ok");
     await refreshTaskViews();
+    const workflow = await triggerTaskCompletionWorkflow(task.id);
+    if (workflow && workflow.invoice_created) {
+      await refreshInvoices();
+      await refreshTimeline();
+    }
+    if (workflow && workflow.email_sent) {
+      toast("Completion email sent.", "ok");
+    }
     if (taskDetail.modal && !taskDetail.modal.hasAttribute("hidden")) {
       await openTaskDetail(task.id);
     }
     return true;
+  }
+
+  async function triggerTaskCompletionWorkflow(taskId) {
+    if (!taskId || !CN.sb || !CN.sb.functions) return null;
+    try {
+      const { data, error } = await CN.sb.functions.invoke("task-completed", {
+        body: { task_id: taskId }
+      });
+      if (error) throw error;
+      return data || null;
+    } catch (e) {
+      toast(`Automation failed: ${e.message || String(e)}`, "error");
+      return null;
+    }
   }
 
   function statusBadge(status) {
@@ -1657,10 +1679,15 @@
       toast("Name is required.", "error");
       return;
     }
+    const email = els.billingContactEmail ? els.billingContactEmail.value.trim() : "";
+    if (!email) {
+      toast("Email is required.", "error");
+      return;
+    }
     const payload = {
       tenant_id: tenantId,
       name,
-      email: els.billingContactEmail ? els.billingContactEmail.value.trim() || null : null,
+      email,
       phone: els.billingContactPhone ? els.billingContactPhone.value.trim() || null : null,
       tax_id: els.billingContactTaxId ? els.billingContactTaxId.value.trim() || null : null,
       country: els.billingContactCountry ? els.billingContactCountry.value.trim() || null : null,
@@ -2223,7 +2250,7 @@
   async function loadTimelineTasks(startDate, endDate) {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, assigned_user_id, property_id, label_id, property:properties(address)")
+      .select("id, day_date, status, duration_minutes, start_at, end_at, completed_at, invoice_id, notes, assigned_user_id, property_id, label_id, property:properties(address)")
       .eq("tenant_id", tenantId)
       .gte("day_date", toDateInputValue(startDate))
       .lte("day_date", toDateInputValue(endDate))
@@ -2256,6 +2283,17 @@
     state.timeline.endDate = monthEnd;
 
     renderTimeline(monthTasks, monthTasks, monthActivities, monthStart, monthEnd);
+  }
+
+  async function openInvoiceFromTimeline(invoiceId) {
+    if (!invoiceId) return;
+    state.selectedInvoiceId = invoiceId;
+    setActiveTab("invoices");
+    await refreshInvoices();
+    selectInvoice(invoiceId);
+    if (els.invoicePreview) {
+      els.invoicePreview.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   function renderTimeline(tasks, monthTasks, activities, startDate, endDate) {
@@ -2383,6 +2421,18 @@
               openTaskDetail(task).catch((e) => toast(e.message || String(e), "error"));
             });
             actions.appendChild(detailBtn);
+            if (task.invoice_id) {
+              const invoiceBtn = document.createElement("button");
+              invoiceBtn.className = "btn";
+              invoiceBtn.type = "button";
+              invoiceBtn.textContent = "Invoice";
+              invoiceBtn.addEventListener("click", () => {
+                openInvoiceFromTimeline(task.invoice_id).catch((e) => {
+                  toast(e.message || String(e), "error");
+                });
+              });
+              actions.appendChild(invoiceBtn);
+            }
 
             booking.appendChild(main);
             if (status) booking.appendChild(status);
