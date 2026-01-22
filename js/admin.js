@@ -101,9 +101,11 @@
     timelineHeatmap: $("timelineHeatmap"),
     timelineDays: $("timelineDays"),
     timelineAddModal: $("timelineAddModal"),
+    timelineAddOwner: $("timelineAddOwner"),
+    timelineAddProperty: $("timelineAddProperty"),
     timelineAddSearch: $("timelineAddSearch"),
-    timelineAddResults: $("timelineAddResults"),
-    timelineAddSelected: $("timelineAddSelected"),
+    timelineAddActivityType: $("timelineAddActivityType"),
+    timelineAddStaff: $("timelineAddStaff"),
     timelineAddTime: $("timelineAddTime"),
     timelineAddDuration: $("timelineAddDuration"),
     timelineAddTbd: $("timelineAddTbd"),
@@ -1947,9 +1949,27 @@
       });
     }
 
+    if (els.timelineAddOwner) {
+      els.timelineAddOwner.addEventListener("change", () => {
+        renderTimelinePropResults(els.timelineAddSearch ? els.timelineAddSearch.value : "");
+      });
+    }
+
+    if (els.timelineAddProperty) {
+      els.timelineAddProperty.addEventListener("change", () => {
+        state.timeline.selectedPropertyId = els.timelineAddProperty.value || null;
+      });
+    }
+
     if (els.timelineAddSearch) {
       els.timelineAddSearch.addEventListener("input", () => {
         renderTimelinePropResults(els.timelineAddSearch.value || "");
+      });
+    }
+
+    if (els.timelineAddActivityType) {
+      els.timelineAddActivityType.addEventListener("change", () => {
+        updateTimelineAddMode();
       });
     }
 
@@ -2271,6 +2291,95 @@
     els.timelineHeatmap.appendChild(grid);
   }
 
+  function getTimelineOwners() {
+    const ownerIds = new Set();
+    state.properties.forEach((prop) => {
+      if (prop.owner_user_id) ownerIds.add(prop.owner_user_id);
+    });
+    return state.clients.filter((client) => ownerIds.has(client.id));
+  }
+
+  function populateTimelineOwnerSelect(selectedOwnerId) {
+    if (!els.timelineAddOwner) return;
+    const current = selectedOwnerId || els.timelineAddOwner.value || "";
+    const owners = getTimelineOwners().slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    els.timelineAddOwner.innerHTML = "";
+    const allOpt = document.createElement("option");
+    allOpt.value = "";
+    allOpt.textContent = "All owners";
+    els.timelineAddOwner.appendChild(allOpt);
+    owners.forEach((owner) => {
+      const opt = document.createElement("option");
+      opt.value = owner.id;
+      opt.textContent = owner.name || owner.email || "Owner";
+      els.timelineAddOwner.appendChild(opt);
+    });
+    els.timelineAddOwner.value = current;
+  }
+
+  function populateTimelineActivityTypeSelect() {
+    if (!els.timelineAddActivityType) return;
+    const current = els.timelineAddActivityType.value || "";
+    els.timelineAddActivityType.innerHTML = "";
+    const bookingOpt = document.createElement("option");
+    bookingOpt.value = "";
+    bookingOpt.textContent = "Booking (default)";
+    els.timelineAddActivityType.appendChild(bookingOpt);
+    state.activityTypes.forEach((type) => {
+      const opt = document.createElement("option");
+      opt.value = type.id;
+      opt.textContent = type.name;
+      els.timelineAddActivityType.appendChild(opt);
+    });
+    els.timelineAddActivityType.value = current;
+  }
+
+  function populateTimelineStaffSelect() {
+    if (!els.timelineAddStaff) return;
+    const current = els.timelineAddStaff.value || "";
+    els.timelineAddStaff.innerHTML = "";
+    const meOpt = document.createElement("option");
+    meOpt.value = userId;
+    meOpt.textContent = "Me (Admin)";
+    els.timelineAddStaff.appendChild(meOpt);
+    state.staff.forEach((staff) => {
+      const opt = document.createElement("option");
+      opt.value = staff.id;
+      opt.textContent = staff.name || staff.email || "Staff";
+      els.timelineAddStaff.appendChild(opt);
+    });
+    els.timelineAddStaff.value = current || userId;
+  }
+
+  function updateTimelineAddMode() {
+    const activityTypeId = els.timelineAddActivityType ? els.timelineAddActivityType.value : "";
+    const isActivity = Boolean(activityTypeId);
+    if (els.timelineAddStaff) {
+      els.timelineAddStaff.disabled = !isActivity;
+      if (isActivity && !els.timelineAddStaff.value) {
+        els.timelineAddStaff.value = userId;
+      }
+      if (!isActivity) {
+        els.timelineAddStaff.value = "";
+      }
+    }
+    if (els.timelineAddHint) {
+      if (isActivity) {
+        const type = state.activityTypes.find((t) => t.id === activityTypeId);
+        els.timelineAddHint.textContent = `Activity: ${type ? type.name : "Activity"}`;
+      } else {
+        const label = getLabelById(findDefaultLabelId());
+        els.timelineAddHint.textContent = `Label: ${label ? label.name : "Not set"} (can be edited later)`;
+      }
+    }
+    if (els.timelineAddDuration && isActivity) {
+      const type = state.activityTypes.find((t) => t.id === activityTypeId);
+      if (type && Number.isFinite(Number(type.default_duration_minutes))) {
+        els.timelineAddDuration.value = String(type.default_duration_minutes);
+      }
+    }
+  }
+
   function openTimelineAddModal(date, preselectedPropertyId) {
     if (!els.timelineAddModal) return;
     state.timeline.selectedDate = date;
@@ -2278,26 +2387,27 @@
     if (els.timelineAddTitle) {
       els.timelineAddTitle.textContent = `Add booking - ${fmtDateLabel(date)}`;
     }
-    if (els.timelineAddHint) {
-      const label = getLabelById(findDefaultLabelId());
-      els.timelineAddHint.textContent = `Label: ${label ? label.name : "Not set"} (can be edited later)`;
-    }
-    if (els.timelineAddSelected) {
-      if (preselectedPropertyId) {
-        const prop = getPropertyById(preselectedPropertyId);
-        els.timelineAddSelected.textContent = prop ? `Selected: ${prop.address}` : "Selected: property";
-        els.timelineAddSelected.style.display = "block";
-      } else {
-        els.timelineAddSelected.textContent = "";
-        els.timelineAddSelected.style.display = "none";
-      }
-    }
     if (els.timelineAddSearch) els.timelineAddSearch.value = "";
     if (els.timelineAddNotes) els.timelineAddNotes.value = "";
     if (els.timelineAddTbd) els.timelineAddTbd.checked = false;
     if (els.timelineAddTime) els.timelineAddTime.value = "09:00";
     if (els.timelineAddDuration) els.timelineAddDuration.value = "120";
+    populateTimelineOwnerSelect();
+    populateTimelineActivityTypeSelect();
+    populateTimelineStaffSelect();
+    if (preselectedPropertyId && els.timelineAddProperty) {
+      const prop = getPropertyById(preselectedPropertyId);
+      if (prop && els.timelineAddOwner) {
+        els.timelineAddOwner.value = prop.owner_user_id || "";
+      }
+    }
     renderTimelinePropResults("");
+    if (els.timelineAddProperty && preselectedPropertyId) {
+      els.timelineAddProperty.value = preselectedPropertyId;
+      state.timeline.selectedPropertyId = preselectedPropertyId;
+    }
+    if (els.timelineAddActivityType) els.timelineAddActivityType.value = "";
+    updateTimelineAddMode();
     els.timelineAddModal.removeAttribute("hidden");
   }
 
@@ -2306,47 +2416,90 @@
   }
 
   function renderTimelinePropResults(filterText) {
-    if (!els.timelineAddResults) return;
+    if (!els.timelineAddProperty) return;
     const query = (filterText || "").trim().toLowerCase();
-    els.timelineAddResults.innerHTML = "";
+    const ownerId = els.timelineAddOwner ? els.timelineAddOwner.value : "";
+    const selectedId = els.timelineAddProperty.value || state.timeline.selectedPropertyId || "";
     const results = state.properties.filter((prop) => {
+      if (ownerId && prop.owner_user_id !== ownerId) return false;
       const owner = state.clients.find((c) => c.id === prop.owner_user_id);
       const hay = [prop.address, owner ? owner.name : "", owner ? owner.email : "", owner ? owner.phone : ""].join(" ").toLowerCase();
       return !query || hay.includes(query);
     });
-
-    results.slice(0, 20).forEach((prop) => {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = "timeline-prop-row";
+    els.timelineAddProperty.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select property";
+    els.timelineAddProperty.appendChild(placeholder);
+    results.forEach((prop) => {
       const owner = state.clients.find((c) => c.id === prop.owner_user_id);
-      row.innerHTML = `<div class="timeline-prop-row__top">${prop.address}</div><div class="timeline-prop-row__sub">${owner ? owner.name : "Client"}</div>`;
-      row.addEventListener("click", () => {
-        state.timeline.selectedPropertyId = prop.id;
-        if (els.timelineAddSelected) {
-          els.timelineAddSelected.textContent = `Selected: ${prop.address}`;
-          els.timelineAddSelected.style.display = "block";
-        }
-      });
-      els.timelineAddResults.appendChild(row);
+      const opt = document.createElement("option");
+      opt.value = prop.id;
+      opt.textContent = `${prop.address || "Property"}${owner ? ` — ${owner.name || owner.email || "Owner"}` : ""}`;
+      els.timelineAddProperty.appendChild(opt);
     });
+    if (selectedId && results.some((prop) => prop.id === selectedId)) {
+      els.timelineAddProperty.value = selectedId;
+      state.timeline.selectedPropertyId = selectedId;
+    } else {
+      els.timelineAddProperty.value = "";
+      state.timeline.selectedPropertyId = null;
+    }
   }
 
   async function saveTimelineBooking() {
     const day = state.timeline.selectedDate;
-    const propertyId = state.timeline.selectedPropertyId;
-    if (!day || !propertyId) {
-      toast("Select a property and date.", "error");
+    const activityTypeId = els.timelineAddActivityType ? els.timelineAddActivityType.value : "";
+    const isActivity = Boolean(activityTypeId);
+    const propertyId = els.timelineAddProperty ? (els.timelineAddProperty.value || null) : state.timeline.selectedPropertyId;
+    if (!day) {
+      toast("Select a date.", "error");
+      return;
+    }
+    if (!isActivity && !propertyId) {
+      toast("Select a property.", "error");
       return;
     }
     const labelId = findDefaultLabelId();
+    const duration = els.timelineAddDuration ? Number(els.timelineAddDuration.value || 0) : null;
+    const notes = els.timelineAddNotes ? els.timelineAddNotes.value.trim() : "";
+    const tbd = els.timelineAddTbd ? els.timelineAddTbd.checked : false;
+    if (isActivity) {
+      const type = state.activityTypes.find((t) => t.id === activityTypeId);
+      if (!type) {
+        toast("Select an activity type.", "error");
+        return;
+      }
+      const staffId = els.timelineAddStaff ? els.timelineAddStaff.value : "";
+      const payload = {
+        tenant_id: tenantId,
+        type_id: type.id,
+        type_name_snapshot: type.name,
+        day_date: toDateInputValue(day),
+        duration_minutes: duration || type.default_duration_minutes || null,
+        status: "planned",
+        assigned_user_id: staffId || userId,
+        property_id: propertyId || null,
+        notes: notes || null,
+        created_by_user_id: userId
+      };
+      if (type.color) payload.color = type.color;
+      if (!tbd && els.timelineAddTime) {
+        const time = els.timelineAddTime.value || "09:00";
+        const start = new Date(`${toDateInputValue(day)}T${time}:00`);
+        payload.start_at = start.toISOString();
+      }
+      const { error: activityError } = await CN.sb.from("activities").insert(payload);
+      if (activityError) throw activityError;
+      toast("Activity created.", "ok");
+      closeTimelineAddModal();
+      await refreshTimeline().catch(() => {});
+      return;
+    }
     if (!labelId) {
       toast("No task labels available. Add a label first.", "error");
       return;
     }
-    const duration = els.timelineAddDuration ? Number(els.timelineAddDuration.value || 0) : null;
-    const notes = els.timelineAddNotes ? els.timelineAddNotes.value.trim() : "";
-    const tbd = els.timelineAddTbd ? els.timelineAddTbd.checked : false;
     const payload = {
       tenant_id: tenantId,
       property_id: propertyId,
@@ -3275,47 +3428,6 @@
         openTaskDetail(task).catch((e) => toast(e.message || String(e), "error"));
       });
       actions.appendChild(detailBtn);
-      if (task.status !== "done" && task.status !== "canceled") {
-        const startBtn = document.createElement("button");
-        startBtn.className = "btn";
-        startBtn.type = "button";
-        startBtn.textContent = "Start";
-        startBtn.addEventListener("click", () => {
-          updateTask(task.id, { status: "in_progress", started_at: new Date().toISOString() })
-            .then(refreshTaskViews)
-            .catch((e) => toast(e.message || String(e), "error"));
-        });
-        const doneBtn = document.createElement("button");
-        doneBtn.className = "btn";
-        doneBtn.type = "button";
-        doneBtn.textContent = "Done";
-        doneBtn.addEventListener("click", () => {
-          attemptCompleteTask(task).catch((e) => toast(e.message || String(e), "error"));
-        });
-        const cancelBtn = document.createElement("button");
-        cancelBtn.className = "btn";
-        cancelBtn.type = "button";
-        cancelBtn.textContent = "Cancel";
-        cancelBtn.addEventListener("click", () => {
-          updateTask(task.id, { status: "canceled" })
-            .then(refreshTaskViews)
-            .catch((e) => toast(e.message || String(e), "error"));
-        });
-        actions.appendChild(startBtn);
-        actions.appendChild(doneBtn);
-        actions.appendChild(cancelBtn);
-      } else {
-        const reopen = document.createElement("button");
-        reopen.className = "btn";
-        reopen.type = "button";
-        reopen.textContent = "Reopen";
-        reopen.addEventListener("click", () => {
-          updateTask(task.id, { status: "planned", started_at: null, completed_at: null })
-            .then(refreshTaskViews)
-            .catch((e) => toast(e.message || String(e), "error"));
-        });
-        actions.appendChild(reopen);
-      }
       actionsCell.appendChild(actions);
 
       row.appendChild(dateCell);

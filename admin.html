@@ -122,10 +122,24 @@
 </div>
 <div class="form" style="margin-top:10px;">
 <div>
-<div class="label">Property</div>
-<input class="input" id="timelineAddSearch" placeholder="Search owner, phone, address…"/>
-<div class="timeline-prop-results" id="timelineAddResults"></div>
-<div class="small-note" id="timelineAddSelected" style="margin-top:8px; display:none;"></div>
+<div class="label">Owner &amp; property</div>
+<div class="row-2">
+<select class="input" id="timelineAddOwner">
+<option value="">All owners</option>
+</select>
+<select class="input" id="timelineAddProperty">
+<option value="">Select property</option>
+</select>
+</div>
+<input class="input" id="timelineAddSearch" placeholder="Search owner, phone, address…" style="margin-top:10px;"/>
+</div>
+<div class="row-2" style="margin-top:12px;">
+<select class="input" id="timelineAddActivityType">
+<option value="">Booking (default)</option>
+</select>
+<select class="input" id="timelineAddStaff" disabled="">
+<option value="">Assigned to (activity)</option>
+</select>
 </div>
 <div class="row-2" style="margin-top:12px;">
 <div>
