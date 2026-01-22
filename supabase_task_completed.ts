@@ -206,7 +206,8 @@ serve(async (req) => {
       const issueDate = (completedAt || task.day_date || new Date().toISOString()).slice(0, 10);
       const { data: invoiceNumber, error: invoiceNumberError } = await supabase.rpc("next_invoice_number", {
         p_tenant_id: task.tenant_id,
-        p_issue_date: issueDate
+        p_issue_date: issueDate,
+        p_owner_user_id: profile.id
       });
       if (invoiceNumberError || !invoiceNumber) {
         return jsonResponse({ error: "Failed to generate invoice number." }, 500);

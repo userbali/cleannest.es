@@ -3323,7 +3323,8 @@
   async function getNextInvoiceNumber(issueDate) {
     const { data, error } = await CN.sb.rpc("next_invoice_number", {
       p_tenant_id: tenantId,
-      p_issue_date: issueDate
+      p_issue_date: issueDate,
+      p_owner_user_id: userId
     });
     if (error) throw error;
     return data;
