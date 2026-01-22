@@ -1737,6 +1737,21 @@ footer{
   background: #fff;
 }
 
+.invoice-preview,
+#invoicePrintArea,
+.invoice-print-area{
+  --surface: #fff;
+  --surface2: #fff;
+  --stroke: #E6EEF8;
+  --text: #0B1B2B;
+  --muted: #52657A;
+  --shadow2: 0 10px 30px rgba(11,27,43,.10);
+  --badge-bg: rgba(11,27,43,.04);
+  --badge-border: rgba(11,27,43,.12);
+  --table-head-bg: rgba(11,27,43,.03);
+  --table-head-text: rgba(11,27,43,.72);
+}
+
 .invoice-preview__head{
   display:flex;
   justify-content:space-between;
