@@ -151,6 +151,7 @@ serve(async (req) => {
     const taskId = body && body.task_id ? String(body.task_id) : "";
     const mode = body && body.mode ? String(body.mode) : "all";
     const emailOnly = mode === "email";
+    const invoiceOnly = mode === "invoice";
     if (!taskId) {
       return jsonResponse({ error: "task_id is required." }, 400);
     }
@@ -260,7 +261,7 @@ serve(async (req) => {
 
     let emailSent = false;
     let emailSkipped = false;
-    if (!task.completion_email_sent_at) {
+    if (!invoiceOnly && !task.completion_email_sent_at) {
       if (!resendKey) {
         return jsonResponse({ error: "Missing RESEND_API_KEY." }, 500);
       }

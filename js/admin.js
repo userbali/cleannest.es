@@ -64,11 +64,11 @@
     workUploadBtn: null,
     refInput: null,
     workInput: null,
-    startBtn: null,
     doneBtn: null,
     cancelBtn: null,
     reopenBtn: null,
     emailBtn: null,
+    invoiceBtn: null,
     priceInput: null,
     priceSaveBtn: null,
     priceMeta: null,
@@ -480,7 +480,7 @@
   async function loadTaskDetail(taskId) {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, price, add_ons, assigned_user_id, property_id, label_id, property:properties(address)")
+      .select("id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, price, add_ons, invoice_id, completion_email_sent_at, assigned_user_id, property_id, label_id, property:properties(address)")
       .eq("id", taskId)
       .single();
     if (error) throw error;
@@ -804,9 +804,9 @@
               <div id="taskWorkGallery"></div>
             </div>
             <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px;">
-              <button class="btn" id="taskStartBtn" type="button">Start</button>
               <button class="btn" id="taskDoneBtn" type="button">Done</button>
               <button class="btn" id="taskEmailBtn" type="button">Send email</button>
+              <button class="btn" id="taskInvoiceBtn" type="button">Create invoice</button>
               <button class="btn" id="taskCancelBtn" type="button">Cancel</button>
               <button class="btn" id="taskReopenBtn" type="button">Reopen</button>
             </div>
@@ -825,9 +825,9 @@
     taskDetail.workGallery = modal.querySelector("#taskWorkGallery");
     taskDetail.refUploadBtn = modal.querySelector("#taskRefUpload");
     taskDetail.workUploadBtn = modal.querySelector("#taskWorkUpload");
-    taskDetail.startBtn = modal.querySelector("#taskStartBtn");
     taskDetail.doneBtn = modal.querySelector("#taskDoneBtn");
     taskDetail.emailBtn = modal.querySelector("#taskEmailBtn");
+    taskDetail.invoiceBtn = modal.querySelector("#taskInvoiceBtn");
     taskDetail.cancelBtn = modal.querySelector("#taskCancelBtn");
     taskDetail.reopenBtn = modal.querySelector("#taskReopenBtn");
     taskDetail.priceInput = modal.querySelector("#taskPriceInput");
@@ -886,18 +886,6 @@
       });
     }
 
-    if (taskDetail.startBtn) {
-      taskDetail.startBtn.addEventListener("click", () => {
-        const task = taskDetail.currentTask;
-        if (!task) return;
-        updateTask(task.id, { status: "in_progress", started_at: new Date().toISOString() })
-          .then(async () => {
-            await refreshTaskViews();
-            await openTaskDetail(task.id);
-          })
-          .catch((e) => toast(e.message || String(e), "error"));
-      });
-    }
     if (taskDetail.doneBtn) {
       taskDetail.doneBtn.addEventListener("click", () => {
         const task = taskDetail.currentTask;
@@ -910,6 +898,13 @@
         const task = taskDetail.currentTask;
         if (!task) return;
         sendTaskCompletionEmail(task).catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (taskDetail.invoiceBtn) {
+      taskDetail.invoiceBtn.addEventListener("click", () => {
+        const task = taskDetail.currentTask;
+        if (!task) return;
+        createInvoiceForTask(task).catch((e) => toast(e.message || String(e), "error"));
       });
     }
     if (taskDetail.cancelBtn) {
@@ -1017,14 +1012,27 @@
   }
 
   function updateTaskDetailActions(task) {
-    if (!taskDetail.startBtn || !taskDetail.doneBtn || !taskDetail.cancelBtn || !taskDetail.reopenBtn) return;
-    const closed = task.status === "done" || task.status === "canceled";
-    taskDetail.startBtn.style.display = closed ? "none" : "";
-    taskDetail.doneBtn.style.display = closed ? "none" : "";
-    taskDetail.cancelBtn.style.display = closed ? "none" : "";
-    taskDetail.reopenBtn.style.display = closed ? "" : "none";
+    if (!taskDetail.doneBtn || !taskDetail.cancelBtn || !taskDetail.reopenBtn) return;
+    const isDone = task.status === "done";
+    const isCanceled = task.status === "canceled";
+    taskDetail.doneBtn.style.display = isCanceled ? "none" : "";
+    taskDetail.cancelBtn.style.display = isDone || isCanceled ? "none" : "";
+    taskDetail.reopenBtn.style.display = isDone || isCanceled ? "" : "none";
+    taskDetail.doneBtn.disabled = isDone;
+    taskDetail.doneBtn.classList.toggle("is-success", isDone);
+    taskDetail.doneBtn.textContent = isDone ? "Completed" : "Done";
     if (taskDetail.emailBtn) {
-      taskDetail.emailBtn.style.display = task.status === "done" ? "" : "none";
+      const sent = Boolean(task.completion_email_sent_at);
+      taskDetail.emailBtn.style.display = isDone ? "" : "none";
+      taskDetail.emailBtn.disabled = sent;
+      taskDetail.emailBtn.classList.toggle("is-success", sent);
+      taskDetail.emailBtn.textContent = sent ? "Email sent" : "Send email";
+    }
+    if (taskDetail.invoiceBtn) {
+      const hasInvoice = Boolean(task.invoice_id);
+      taskDetail.invoiceBtn.style.display = isDone ? "" : "none";
+      taskDetail.invoiceBtn.classList.toggle("is-success", hasInvoice);
+      taskDetail.invoiceBtn.textContent = hasInvoice ? "Open invoice" : "Create invoice";
     }
   }
 
@@ -1190,9 +1198,41 @@
       } else if (payload && payload.email_skipped) {
         toast("Completion email already sent.", "ok");
       }
+      await refreshTaskViews();
+      await openTaskDetail(task.id);
       return payload || null;
     } catch (e) {
       toast(`Email failed: ${e.message || String(e)}`, "error");
+      return null;
+    }
+  }
+
+  async function createInvoiceForTask(task) {
+    if (!task || !task.id) return null;
+    if (task.status !== "done") {
+      toast("Complete the task before creating the invoice.", "error");
+      return null;
+    }
+    if (task.invoice_id) {
+      await openInvoiceFromTimeline(task.invoice_id);
+      return task.invoice_id;
+    }
+    try {
+      const payload = await callAdminFunction("task-completed", {
+        task_id: task.id,
+        mode: "invoice"
+      });
+      if (payload && payload.invoice_id) {
+        toast("Invoice created.", "ok");
+        await refreshInvoices();
+        await refreshTaskViews();
+        await refreshTimeline();
+        await openInvoiceFromTimeline(payload.invoice_id);
+      }
+      await openTaskDetail(task.id);
+      return payload || null;
+    } catch (e) {
+      toast(`Invoice failed: ${e.message || String(e)}`, "error");
       return null;
     }
   }
