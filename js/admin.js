@@ -21,6 +21,7 @@
     clients: [],
     staff: [],
     properties: [],
+    billingContacts: [],
     propertyStaff: [],
     taskLabels: [],
     tasksCache: [],
@@ -30,6 +31,7 @@
     selectedInvoiceId: null,
     invoiceIssuerText: "",
     selectedPropertyId: null,
+    pendingBillingContactPropertyId: null,
     activeTab: "properties",
     timeline: {
       month: "",
@@ -189,7 +191,16 @@
     invoiceSettingsBtn: $("invoiceSettingsBtn"),
     invoiceSettingsModal: $("invoiceSettingsModal"),
     invoiceIssuerText: $("invoiceIssuerText"),
-    invoiceSettingsSave: $("invoiceSettingsSave")
+    invoiceSettingsSave: $("invoiceSettingsSave"),
+    invoiceProperty: $("invoiceProperty"),
+    billingContactModal: $("billingContactModal"),
+    billingContactName: $("billingContactName"),
+    billingContactEmail: $("billingContactEmail"),
+    billingContactPhone: $("billingContactPhone"),
+    billingContactTaxId: $("billingContactTaxId"),
+    billingContactCountry: $("billingContactCountry"),
+    billingContactAddress: $("billingContactAddress"),
+    billingContactSave: $("billingContactSave")
   };
 
   function pad2(n) {
@@ -1206,6 +1217,15 @@
     return state.properties.find((p) => p.id === id);
   }
 
+  function getBillingContactById(id) {
+    return state.billingContacts.find((c) => c.id === id);
+  }
+
+  function formatBillingContactLabel(contact) {
+    if (!contact) return "";
+    return [contact.name, contact.email].filter(Boolean).join(" · ");
+  }
+
   function getLabelById(id) {
     return state.taskLabels.find((l) => l.id === id);
   }
@@ -1238,14 +1258,58 @@
     state.staff = list.filter((p) => p.role === "staff");
   }
 
+  async function loadBillingContacts() {
+    const { data, error } = await CN.sb
+      .from("billing_contacts")
+      .select("id, name, email, phone, tax_id, country, address")
+      .eq("tenant_id", tenantId)
+      .order("name", { ascending: true });
+    if (error) throw error;
+    state.billingContacts = data || [];
+  }
+
   async function loadProperties() {
     const { data, error } = await CN.sb
       .from("properties")
-      .select("id, owner_user_id, address, ownership_type, price, notes, created_at, owner:profiles(id, name, email, phone)")
+      .select("id, owner_user_id, address, ownership_type, price, notes, created_at, billing_contact_id, owner:profiles(id, name, email, phone)")
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
     if (error) throw error;
     state.properties = data || [];
+  }
+
+  function populateBillingContactSelect(selectEl, selectedId) {
+    if (!selectEl) return;
+    const current = selectedId || "";
+    selectEl.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = state.billingContacts.length ? "Select billing contact" : "No billing contacts yet";
+    selectEl.appendChild(placeholder);
+    state.billingContacts.forEach((contact) => {
+      const opt = document.createElement("option");
+      opt.value = contact.id;
+      opt.textContent = formatBillingContactLabel(contact) || contact.name || "Billing contact";
+      selectEl.appendChild(opt);
+    });
+    selectEl.value = current;
+  }
+
+  function populateInvoicePropertySelect() {
+    if (!els.invoiceProperty) return;
+    const current = els.invoiceProperty.value || "";
+    els.invoiceProperty.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select property (optional)";
+    els.invoiceProperty.appendChild(placeholder);
+    state.properties.forEach((prop) => {
+      const opt = document.createElement("option");
+      opt.value = prop.id;
+      opt.textContent = prop.address || "Property";
+      els.invoiceProperty.appendChild(opt);
+    });
+    els.invoiceProperty.value = current;
   }
 
   async function loadPropertyStaff() {
@@ -1314,6 +1378,7 @@
 
   async function refreshBaseData() {
     await loadProfiles();
+    await loadBillingContacts();
     await loadProperties();
     await loadPropertyStaff();
     await loadTaskLabels();
@@ -1332,6 +1397,7 @@
       state.activityTypes = [];
       toast("Activity types could not load. Check permissions.", "error");
     }
+    populateInvoicePropertySelect();
   }
 
   function buildPropertyStats() {
@@ -1501,7 +1567,8 @@
         sub.className = "cx-prop-row__sub";
         const lastStr = stats.lastDone.get(prop.id);
         const lastLabel = lastStr ? `Last cleaned: ${lastStr}` : "";
-        sub.textContent = [prop.notes, lastLabel].filter(Boolean).join(" | ");
+        const billingNote = prop.billing_contact_id ? "" : "Billing contact missing";
+        sub.textContent = [prop.notes, lastLabel, billingNote].filter(Boolean).join(" | ");
         col.appendChild(addr);
         col.appendChild(sub);
 
@@ -1544,7 +1611,63 @@
     toast("Property created.", "ok");
     await loadProperties();
     await loadTasksCache();
+    populateInvoicePropertySelect();
     renderClientsList();
+  }
+
+  function openBillingContactModal(propertyId) {
+    state.pendingBillingContactPropertyId = propertyId || null;
+    if (els.billingContactName) els.billingContactName.value = "";
+    if (els.billingContactEmail) els.billingContactEmail.value = "";
+    if (els.billingContactPhone) els.billingContactPhone.value = "";
+    if (els.billingContactTaxId) els.billingContactTaxId.value = "";
+    if (els.billingContactCountry) els.billingContactCountry.value = "";
+    if (els.billingContactAddress) els.billingContactAddress.value = "";
+    if (els.billingContactModal) els.billingContactModal.removeAttribute("hidden");
+  }
+
+  function closeBillingContactModal() {
+    if (els.billingContactModal) els.billingContactModal.setAttribute("hidden", "");
+    state.pendingBillingContactPropertyId = null;
+  }
+
+  async function saveBillingContact() {
+    const name = els.billingContactName ? els.billingContactName.value.trim() : "";
+    if (!name) {
+      toast("Name is required.", "error");
+      return;
+    }
+    const payload = {
+      tenant_id: tenantId,
+      name,
+      email: els.billingContactEmail ? els.billingContactEmail.value.trim() || null : null,
+      phone: els.billingContactPhone ? els.billingContactPhone.value.trim() || null : null,
+      tax_id: els.billingContactTaxId ? els.billingContactTaxId.value.trim() || null : null,
+      country: els.billingContactCountry ? els.billingContactCountry.value.trim() || null : null,
+      address: els.billingContactAddress ? els.billingContactAddress.value.trim() || null : null
+    };
+    const { data, error } = await CN.sb.from("billing_contacts").insert(payload).select("id").single();
+    if (error) throw error;
+    await loadBillingContacts();
+    const newId = data ? data.id : null;
+    const pendingPropertyId = state.pendingBillingContactPropertyId;
+    state.pendingBillingContactPropertyId = null;
+    if (pendingPropertyId && newId) {
+      const { error: propError } = await CN.sb
+        .from("properties")
+        .update({ billing_contact_id: newId })
+        .eq("id", pendingPropertyId);
+      if (propError) throw propError;
+      const row = state.properties.find((p) => p.id === pendingPropertyId);
+      if (row) row.billing_contact_id = newId;
+      renderClientsList();
+      if (state.selectedPropertyId === pendingPropertyId) {
+        await renderPropertyDetail(row || getPropertyById(pendingPropertyId));
+      }
+    }
+    populateInvoicePropertySelect();
+    toast("Billing contact saved.", "ok");
+    closeBillingContactModal();
   }
 
   async function loadPropertyTasks(propertyId) {
@@ -1712,6 +1835,78 @@
       || lowerNotes === "no notes yet";
     notesBody.textContent = showPlaceholder ? placeholderNote : notesText;
     assetsCard.appendChild(notesBody);
+
+    const billingRow = document.createElement("div");
+    billingRow.className = "row";
+    billingRow.style.alignItems = "center";
+    billingRow.style.justifyContent = "space-between";
+    billingRow.style.gap = "10px";
+    billingRow.style.marginTop = "10px";
+    const billingLabel = document.createElement("div");
+    billingLabel.innerHTML = "<strong>Billing contact</strong>";
+    const billingControls = document.createElement("div");
+    billingControls.style.display = "flex";
+    billingControls.style.gap = "8px";
+    billingControls.style.flexWrap = "wrap";
+    const billingSelect = document.createElement("select");
+    billingSelect.className = "input";
+    billingSelect.style.minWidth = "220px";
+    populateBillingContactSelect(billingSelect, property.billing_contact_id);
+    billingSelect.disabled = !state.billingContacts.length;
+    const billingNewBtn = document.createElement("button");
+    billingNewBtn.type = "button";
+    billingNewBtn.className = "btn";
+    billingNewBtn.textContent = "New contact";
+    billingNewBtn.addEventListener("click", () => openBillingContactModal(property.id));
+    billingControls.appendChild(billingSelect);
+    billingControls.appendChild(billingNewBtn);
+    billingRow.appendChild(billingLabel);
+    billingRow.appendChild(billingControls);
+    assetsCard.appendChild(billingRow);
+
+    const billingMeta = document.createElement("div");
+    billingMeta.className = "small-note";
+    billingMeta.style.marginTop = "6px";
+    const selectedBilling = property.billing_contact_id ? getBillingContactById(property.billing_contact_id) : null;
+    if (!selectedBilling) {
+      billingMeta.textContent = "Billing contact required.";
+    } else {
+      const detailParts = [];
+      if (selectedBilling.email) detailParts.push(selectedBilling.email);
+      if (selectedBilling.phone) detailParts.push(selectedBilling.phone);
+      if (selectedBilling.tax_id) detailParts.push(`Tax ID: ${selectedBilling.tax_id}`);
+      if (selectedBilling.country) detailParts.push(selectedBilling.country);
+      if (selectedBilling.address) detailParts.push(selectedBilling.address);
+      billingMeta.textContent = detailParts.length ? detailParts.join(" | ") : (selectedBilling.name || "Billing contact selected.");
+    }
+    assetsCard.appendChild(billingMeta);
+
+    let currentBillingId = property.billing_contact_id || "";
+    billingSelect.addEventListener("change", async () => {
+      const nextId = billingSelect.value || "";
+      if (!nextId) {
+        toast("Billing contact is required.", "error");
+        billingSelect.value = currentBillingId;
+        return;
+      }
+      try {
+        const { error } = await CN.sb
+          .from("properties")
+          .update({ billing_contact_id: nextId })
+          .eq("id", property.id);
+        if (error) throw error;
+        currentBillingId = nextId;
+        property.billing_contact_id = nextId;
+        const row = state.properties.find((p) => p.id === property.id);
+        if (row) row.billing_contact_id = nextId;
+        toast("Billing contact saved.", "ok");
+        renderClientsList();
+        await renderPropertyDetail(property);
+      } catch (e) {
+        toast(e.message || String(e), "error");
+        billingSelect.value = currentBillingId;
+      }
+    });
 
     const assetsGrid = document.createElement("div");
     assetsGrid.className = "row-2";
@@ -2828,6 +3023,7 @@
   function clearInvoiceForm() {
     if (els.invoiceIssueDate) els.invoiceIssueDate.value = toDateInputValue(new Date());
     if (els.invoiceNumber) els.invoiceNumber.value = "Auto";
+    if (els.invoiceProperty) els.invoiceProperty.value = "";
     if (els.invoiceCustomerName) els.invoiceCustomerName.value = "";
     if (els.invoiceCustomerEmail) els.invoiceCustomerEmail.value = "";
     if (els.invoiceCustomerTaxId) els.invoiceCustomerTaxId.value = "";
@@ -2840,6 +3036,25 @@
   function wireInvoiceControls() {
     if (els.invoiceIssueDate && !els.invoiceIssueDate.value) {
       els.invoiceIssueDate.value = toDateInputValue(new Date());
+    }
+    if (els.invoiceProperty) {
+      populateInvoicePropertySelect();
+      els.invoiceProperty.addEventListener("change", () => {
+        const propertyId = els.invoiceProperty.value || "";
+        if (!propertyId) return;
+        const prop = getPropertyById(propertyId);
+        const contact = prop && prop.billing_contact_id ? getBillingContactById(prop.billing_contact_id) : null;
+        if (!contact) {
+          toast("Billing contact is required for this property.", "error");
+          els.invoiceProperty.value = "";
+          return;
+        }
+        if (els.invoiceCustomerName) els.invoiceCustomerName.value = contact.name || "";
+        if (els.invoiceCustomerEmail) els.invoiceCustomerEmail.value = contact.email || "";
+        if (els.invoiceCustomerTaxId) els.invoiceCustomerTaxId.value = contact.tax_id || "";
+        if (els.invoiceCustomerCountry) els.invoiceCustomerCountry.value = contact.country || "";
+        if (els.invoiceCustomerAddress) els.invoiceCustomerAddress.value = contact.address || "";
+      });
     }
     if (els.invoiceSaveBtn) {
       els.invoiceSaveBtn.addEventListener("click", () => {
@@ -2877,6 +3092,22 @@
             const invoice = state.invoices.find((inv) => inv.id === state.selectedInvoiceId);
             renderInvoicePreview(invoice || null);
           })
+          .catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+  }
+
+  function wireBillingContactControls() {
+    if (els.billingContactModal) {
+      els.billingContactModal.addEventListener("click", (ev) => {
+        if (ev.target && ev.target.dataset && ev.target.dataset.action === "billing-contact-cancel") {
+          closeBillingContactModal();
+        }
+      });
+    }
+    if (els.billingContactSave) {
+      els.billingContactSave.addEventListener("click", () => {
+        saveBillingContact()
           .catch((e) => toast(e.message || String(e), "error"));
       });
     }
@@ -3255,6 +3486,7 @@
 
   async function createInvoice() {
     const issueDate = els.invoiceIssueDate ? (els.invoiceIssueDate.value || toDateInputValue(new Date())) : toDateInputValue(new Date());
+    const propertyId = els.invoiceProperty ? (els.invoiceProperty.value || null) : null;
     const customerName = els.invoiceCustomerName ? els.invoiceCustomerName.value.trim() : "";
     const customerEmail = els.invoiceCustomerEmail ? els.invoiceCustomerEmail.value.trim() : "";
     const customerTaxId = els.invoiceCustomerTaxId ? els.invoiceCustomerTaxId.value.trim() : "";
@@ -3276,6 +3508,13 @@
       toast("Add at least one item.", "error");
       return;
     }
+    if (propertyId) {
+      const prop = getPropertyById(propertyId);
+      if (!prop || !prop.billing_contact_id) {
+        toast("Billing contact is required for this property.", "error");
+        return;
+      }
+    }
 
     const invoiceTotal = items.reduce((sum, item) => sum + (Number(item.line_total) || 0), 0);
     const customerAddressPayload = packInvoiceCustomerAddress(customerAddress, customerTaxId, customerCountry);
@@ -3283,7 +3522,7 @@
     const { data: invoice, error } = await CN.sb.from("invoices").insert({
       tenant_id: tenantId,
       owner_user_id: userId,
-      property_id: null,
+      property_id: propertyId || null,
       status: "draft",
       issue_date: issueDate,
       total: invoiceTotal,
@@ -4144,6 +4383,7 @@
     wireScheduleControls();
     wireActivitiesControls();
     wireInvoiceControls();
+    wireBillingContactControls();
 
     if (els.adminSearch) els.adminSearch.addEventListener("input", renderClientsList);
     if (els.filterActiveSession) els.filterActiveSession.addEventListener("change", renderClientsList);

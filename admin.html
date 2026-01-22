@@ -222,6 +222,9 @@
 <input class="input" id="invoiceIssueDate" type="date"/>
 <input class="input" disabled="" id="invoiceNumber" placeholder="Auto number"/>
 </div>
+<div class="label" style="margin-top:10px;">Property (optional)</div>
+<select class="input" id="invoiceProperty"></select>
+<div class="small-note" style="margin-top:6px;">Auto-fills customer details from the property's billing contact.</div>
 <div class="row-2" style="margin-top:10px;">
 <input class="input" id="invoiceCustomerName" placeholder="Customer name"/>
 <input class="input" id="invoiceCustomerEmail" placeholder="Customer email (optional)" type="email"/>
@@ -279,6 +282,36 @@
 <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
 <button class="btn" data-action="invoice-settings-cancel" type="button">Cancel</button>
 <button class="btn btn-primary" id="invoiceSettingsSave" type="button">Save</button>
+</div>
+</div>
+</div>
+</div>
+<div class="cn-modal" hidden="" id="billingContactModal">
+<div class="cn-modal__overlay" data-action="billing-contact-cancel"></div>
+<div aria-label="New billing contact" aria-modal="true" class="cn-modal__panel" role="dialog">
+<div class="cn-modal__head">
+<div>
+<strong>New billing contact</strong>
+<div class="small-note">Used for property invoices</div>
+</div>
+<button class="btn" data-action="billing-contact-cancel" type="button">Close</button>
+</div>
+<div class="form" style="margin-top:10px;">
+<div class="row-2">
+<input class="input" id="billingContactName" placeholder="Full name or company"/>
+<input class="input" id="billingContactEmail" placeholder="Email (optional)" type="email"/>
+</div>
+<div class="row-2" style="margin-top:10px;">
+<input class="input" id="billingContactPhone" placeholder="Phone (optional)"/>
+<input class="input" id="billingContactTaxId" placeholder="Tax ID (optional)"/>
+</div>
+<div class="row-2" style="margin-top:10px;">
+<input class="input" id="billingContactCountry" placeholder="Country (optional)"/>
+</div>
+<textarea class="input" id="billingContactAddress" placeholder="Billing address (optional)" rows="3" style="margin-top:10px; width:100%;"></textarea>
+<div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+<button class="btn" data-action="billing-contact-cancel" type="button">Cancel</button>
+<button class="btn btn-primary" id="billingContactSave" type="button">Save</button>
 </div>
 </div>
 </div>
