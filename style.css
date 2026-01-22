@@ -1734,6 +1734,7 @@ footer{
 
 .invoice-preview{
   margin-top: 14px;
+  background: #fff;
 }
 
 .invoice-preview__head{
@@ -1755,6 +1756,12 @@ footer{
   display:flex;
   flex-direction:column;
   gap:12px;
+}
+
+.invoice-preview .invoice-doc__block,
+.invoice-preview .invoice-doc__table,
+.invoice-preview .invoice-doc__row.head{
+  background: #fff;
 }
 
 .invoice-doc__header{
