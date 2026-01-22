@@ -2118,9 +2118,18 @@
 
             const main = document.createElement("div");
             main.className = "timeline-booking__main";
-            const time = document.createElement("div");
+            const timeRow = document.createElement("div");
+            timeRow.className = "timeline-booking__time-row";
+            const time = document.createElement("span");
             time.className = "timeline-booking__time";
             time.textContent = fmtTimeRange(task.start_at, task.end_at, task.duration_minutes);
+            timeRow.appendChild(time);
+            if (task.status === "done") {
+              const badge = document.createElement("span");
+              badge.className = "badge completed";
+              badge.textContent = "Completed";
+              timeRow.appendChild(badge);
+            }
             const addr = document.createElement("div");
             addr.className = "timeline-booking__addr";
             addr.textContent = (task.property && task.property.address) || (getPropertyById(task.property_id) || {}).address || "Property";
@@ -2135,7 +2144,7 @@
               if (completed) metaParts.push(`Completed: ${completed}`);
             }
             meta.textContent = metaParts.filter(Boolean).join(" | ");
-            main.appendChild(time);
+            main.appendChild(timeRow);
             main.appendChild(addr);
             main.appendChild(meta);
 
@@ -2166,9 +2175,18 @@
 
           const main = document.createElement("div");
           main.className = "timeline-booking__main";
-          const time = document.createElement("div");
+          const timeRow = document.createElement("div");
+          timeRow.className = "timeline-booking__time-row";
+          const time = document.createElement("span");
           time.className = "timeline-booking__time";
           time.textContent = fmtTimeRange(activity.start_at, null, activity.duration_minutes);
+          timeRow.appendChild(time);
+          if (activity.status === "done") {
+            const badge = document.createElement("span");
+            badge.className = "badge completed";
+            badge.textContent = "Completed";
+            timeRow.appendChild(badge);
+          }
         const addr = document.createElement("div");
         addr.className = "timeline-booking__addr";
         const prop = activity.property_id ? getPropertyById(activity.property_id) : null;
@@ -2182,7 +2200,7 @@
         metaParts.push(staffName);
         if (activity.notes) metaParts.push(activity.notes);
         meta.textContent = metaParts.filter(Boolean).join(" | ");
-          main.appendChild(time);
+          main.appendChild(timeRow);
           main.appendChild(addr);
           main.appendChild(meta);
 
