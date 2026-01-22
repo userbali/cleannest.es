@@ -2125,47 +2125,6 @@
               openTaskDetail(task).catch((e) => toast(e.message || String(e), "error"));
             });
             actions.appendChild(detailBtn);
-            if (task.status !== "done" && task.status !== "canceled") {
-              const startBtn = document.createElement("button");
-              startBtn.className = "btn";
-              startBtn.type = "button";
-              startBtn.textContent = "Start";
-              startBtn.addEventListener("click", () => {
-                updateTask(task.id, { status: "in_progress", started_at: new Date().toISOString() })
-                  .then(refreshTaskViews)
-                  .catch((e) => toast(e.message || String(e), "error"));
-              });
-              const doneBtn = document.createElement("button");
-              doneBtn.className = "btn";
-              doneBtn.type = "button";
-              doneBtn.textContent = "Done";
-              doneBtn.addEventListener("click", () => {
-                attemptCompleteTask(task).catch((e) => toast(e.message || String(e), "error"));
-              });
-              const cancelBtn = document.createElement("button");
-              cancelBtn.className = "btn";
-              cancelBtn.type = "button";
-              cancelBtn.textContent = "Cancel";
-              cancelBtn.addEventListener("click", () => {
-                updateTask(task.id, { status: "canceled" })
-                  .then(refreshTaskViews)
-                  .catch((e) => toast(e.message || String(e), "error"));
-              });
-              actions.appendChild(startBtn);
-              actions.appendChild(doneBtn);
-              actions.appendChild(cancelBtn);
-            } else {
-              const reopen = document.createElement("button");
-              reopen.className = "btn";
-              reopen.type = "button";
-              reopen.textContent = "Reopen";
-              reopen.addEventListener("click", () => {
-                updateTask(task.id, { status: "planned", started_at: null, completed_at: null })
-                  .then(refreshTaskViews)
-                  .catch((e) => toast(e.message || String(e), "error"));
-              });
-              actions.appendChild(reopen);
-            }
 
             booking.appendChild(main);
             booking.appendChild(actions);
