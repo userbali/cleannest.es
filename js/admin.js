@@ -318,6 +318,17 @@
     return startLabel;
   }
 
+  function fmtDateTime(ts) {
+    if (!ts) return "";
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "";
+    return `${toDateInputValue(d)} ${d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    })}`;
+  }
+
   function parseAmount(value) {
     if (value == null) return null;
     const raw = String(value).trim();
@@ -1990,7 +2001,7 @@
   async function loadTimelineTasks(startDate, endDate) {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, assigned_user_id, property_id, label_id, property:properties(address)")
+      .select("id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, assigned_user_id, property_id, label_id, property:properties(address)")
       .eq("tenant_id", tenantId)
       .gte("day_date", toDateInputValue(startDate))
       .lte("day_date", toDateInputValue(endDate))
@@ -2117,7 +2128,13 @@
             meta.className = "timeline-booking__meta";
             const label = getLabelById(task.label_id);
             const staffName = task.assigned_user_id ? getStaffName(task.assigned_user_id) : "Unassigned";
-            meta.textContent = [label ? label.name : "Task", staffName, task.notes].filter(Boolean).join(" | ");
+            const metaParts = [label ? label.name : "Task", staffName];
+            if (task.notes) metaParts.push(task.notes);
+            if (task.status === "done") {
+              const completed = fmtDateTime(task.completed_at);
+              if (completed) metaParts.push(`Completed: ${completed}`);
+            }
+            meta.textContent = metaParts.filter(Boolean).join(" | ");
             main.appendChild(time);
             main.appendChild(addr);
             main.appendChild(meta);
