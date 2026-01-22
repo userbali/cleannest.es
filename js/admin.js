@@ -36,6 +36,7 @@
       metric: "jobs",
       selectedDate: null,
       selectedPropertyId: null,
+      staffTouched: false,
       activities: []
     },
     schedule: {
@@ -1973,6 +1974,12 @@
       });
     }
 
+    if (els.timelineAddStaff) {
+      els.timelineAddStaff.addEventListener("change", () => {
+        state.timeline.staffTouched = true;
+      });
+    }
+
     if (els.timelineAddSave) {
       els.timelineAddSave.addEventListener("click", () => {
         saveTimelineBooking().catch((e) => toast(e.message || String(e), "error"));
@@ -2297,6 +2304,10 @@
     if (!els.timelineAddStaff) return;
     const current = els.timelineAddStaff.value || "";
     els.timelineAddStaff.innerHTML = "";
+    const noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.textContent = "Staff";
+    els.timelineAddStaff.appendChild(noneOpt);
     const meOpt = document.createElement("option");
     meOpt.value = userId;
     meOpt.textContent = "Me (Admin)";
@@ -2307,19 +2318,15 @@
       opt.textContent = staff.name || staff.email || "Staff";
       els.timelineAddStaff.appendChild(opt);
     });
-    els.timelineAddStaff.value = current || userId;
+    els.timelineAddStaff.value = current;
   }
 
   function updateTimelineAddMode() {
     const activityTypeId = els.timelineAddActivityType ? els.timelineAddActivityType.value : "";
     const isActivity = Boolean(activityTypeId);
     if (els.timelineAddStaff) {
-      els.timelineAddStaff.disabled = !isActivity;
-      if (isActivity && !els.timelineAddStaff.value) {
-        els.timelineAddStaff.value = userId;
-      }
-      if (!isActivity) {
-        els.timelineAddStaff.value = "";
+      if (!state.timeline.staffTouched) {
+        els.timelineAddStaff.value = isActivity ? userId : "";
       }
     }
     if (els.timelineAddHint) {
@@ -2343,6 +2350,7 @@
     if (!els.timelineAddModal) return;
     state.timeline.selectedDate = date;
     state.timeline.selectedPropertyId = preselectedPropertyId || null;
+    state.timeline.staffTouched = false;
     if (els.timelineAddTitle) {
       els.timelineAddTitle.textContent = `Add booking - ${fmtDateLabel(date)}`;
     }
@@ -2351,6 +2359,7 @@
     if (els.timelineAddTbd) els.timelineAddTbd.checked = false;
     if (els.timelineAddTime) els.timelineAddTime.value = "09:00";
     if (els.timelineAddDuration) els.timelineAddDuration.value = "120";
+    if (els.timelineAddStaff) els.timelineAddStaff.value = "";
     populateTimelineOwnerSelect();
     populateTimelineActivityTypeSelect();
     populateTimelineStaffSelect();
@@ -2469,6 +2478,8 @@
       created_by_user_id: userId,
       notes: notes || null
     };
+    const staffId = els.timelineAddStaff ? els.timelineAddStaff.value : "";
+    if (staffId) payload.assigned_user_id = staffId;
     const prop = getPropertyById(propertyId);
     const propPrice = parseAmount(prop && prop.price);
     if (Number.isFinite(propPrice)) {
