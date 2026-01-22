@@ -149,6 +149,8 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const taskId = body && body.task_id ? String(body.task_id) : "";
+    const mode = body && body.mode ? String(body.mode) : "all";
+    const emailOnly = mode === "email";
     if (!taskId) {
       return jsonResponse({ error: "task_id is required." }, 400);
     }
@@ -186,7 +188,7 @@ serve(async (req) => {
 
     let invoiceId = task.invoice_id || null;
     let invoiceCreated = false;
-    if (!invoiceId) {
+    if (!emailOnly && !invoiceId) {
       if (!property.billing_contact_id) {
         return jsonResponse({ error: "Billing contact is required for this property." }, 400);
       }

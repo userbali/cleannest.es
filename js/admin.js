@@ -68,6 +68,7 @@
     doneBtn: null,
     cancelBtn: null,
     reopenBtn: null,
+    emailBtn: null,
     priceInput: null,
     priceSaveBtn: null,
     priceMeta: null,
@@ -805,6 +806,7 @@
             <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px;">
               <button class="btn" id="taskStartBtn" type="button">Start</button>
               <button class="btn" id="taskDoneBtn" type="button">Done</button>
+              <button class="btn" id="taskEmailBtn" type="button">Send email</button>
               <button class="btn" id="taskCancelBtn" type="button">Cancel</button>
               <button class="btn" id="taskReopenBtn" type="button">Reopen</button>
             </div>
@@ -825,6 +827,7 @@
     taskDetail.workUploadBtn = modal.querySelector("#taskWorkUpload");
     taskDetail.startBtn = modal.querySelector("#taskStartBtn");
     taskDetail.doneBtn = modal.querySelector("#taskDoneBtn");
+    taskDetail.emailBtn = modal.querySelector("#taskEmailBtn");
     taskDetail.cancelBtn = modal.querySelector("#taskCancelBtn");
     taskDetail.reopenBtn = modal.querySelector("#taskReopenBtn");
     taskDetail.priceInput = modal.querySelector("#taskPriceInput");
@@ -900,6 +903,13 @@
         const task = taskDetail.currentTask;
         if (!task) return;
         attemptCompleteTask(task).catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (taskDetail.emailBtn) {
+      taskDetail.emailBtn.addEventListener("click", () => {
+        const task = taskDetail.currentTask;
+        if (!task) return;
+        sendTaskCompletionEmail(task).catch((e) => toast(e.message || String(e), "error"));
       });
     }
     if (taskDetail.cancelBtn) {
@@ -1013,6 +1023,9 @@
     taskDetail.doneBtn.style.display = closed ? "none" : "";
     taskDetail.cancelBtn.style.display = closed ? "none" : "";
     taskDetail.reopenBtn.style.display = closed ? "" : "none";
+    if (taskDetail.emailBtn) {
+      taskDetail.emailBtn.style.display = task.status === "done" ? "" : "none";
+    }
   }
 
   async function handleReferenceUpload(files) {
@@ -1155,30 +1168,31 @@
     await updateTask(task.id, { status: "done", completed_at: new Date().toISOString() });
     toast("Task completed.", "ok");
     await refreshTaskViews();
-    const workflow = await triggerTaskCompletionWorkflow(task.id);
-    if (workflow && workflow.invoice_created) {
-      await refreshInvoices();
-      await refreshTimeline();
-    }
-    if (workflow && workflow.email_sent) {
-      toast("Completion email sent.", "ok");
-    }
     if (taskDetail.modal && !taskDetail.modal.hasAttribute("hidden")) {
       await openTaskDetail(task.id);
     }
     return true;
   }
 
-  async function triggerTaskCompletionWorkflow(taskId) {
-    if (!taskId || !CN.sb || !CN.sb.functions) return null;
+  async function sendTaskCompletionEmail(task) {
+    if (!task || !task.id) return null;
+    if (task.status !== "done") {
+      toast("Complete the task before sending the email.", "error");
+      return null;
+    }
     try {
-      const { data, error } = await CN.sb.functions.invoke("task-completed", {
-        body: { task_id: taskId }
+      const payload = await callAdminFunction("task-completed", {
+        task_id: task.id,
+        mode: "email"
       });
-      if (error) throw error;
-      return data || null;
+      if (payload && payload.email_sent) {
+        toast("Completion email sent.", "ok");
+      } else if (payload && payload.email_skipped) {
+        toast("Completion email already sent.", "ok");
+      }
+      return payload || null;
     } catch (e) {
-      toast(`Automation failed: ${e.message || String(e)}`, "error");
+      toast(`Email failed: ${e.message || String(e)}`, "error");
       return null;
     }
   }
