@@ -193,6 +193,8 @@
     invoiceIssuerText: $("invoiceIssuerText"),
     invoiceSettingsSave: $("invoiceSettingsSave"),
     invoiceProperty: $("invoiceProperty"),
+    invoiceBillingContact: $("invoiceBillingContact"),
+    invoiceBillingNewBtn: $("invoiceBillingNewBtn"),
     billingContactModal: $("billingContactModal"),
     billingContactName: $("billingContactName"),
     billingContactEmail: $("billingContactEmail"),
@@ -1312,6 +1314,23 @@
     els.invoiceProperty.value = current;
   }
 
+  function populateInvoiceBillingContactSelect(selectedId) {
+    if (!els.invoiceBillingContact) return;
+    const current = selectedId || els.invoiceBillingContact.value || "";
+    els.invoiceBillingContact.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = state.billingContacts.length ? "Select billing contact" : "No billing contacts yet";
+    els.invoiceBillingContact.appendChild(placeholder);
+    state.billingContacts.forEach((contact) => {
+      const opt = document.createElement("option");
+      opt.value = contact.id;
+      opt.textContent = formatBillingContactLabel(contact) || contact.name || "Billing contact";
+      els.invoiceBillingContact.appendChild(opt);
+    });
+    els.invoiceBillingContact.value = current;
+  }
+
   async function loadPropertyStaff() {
     const { data, error } = await CN.sb
       .from("property_staff")
@@ -1398,6 +1417,7 @@
       toast("Activity types could not load. Check permissions.", "error");
     }
     populateInvoicePropertySelect();
+    populateInvoiceBillingContactSelect();
   }
 
   function buildPropertyStats() {
@@ -1666,6 +1686,13 @@
       }
     }
     populateInvoicePropertySelect();
+    populateInvoiceBillingContactSelect(newId);
+    if (!pendingPropertyId && newId && els.invoiceBillingContact) {
+      els.invoiceBillingContact.value = newId;
+      els.invoiceBillingContact.disabled = false;
+      const contact = getBillingContactById(newId);
+      if (contact) fillInvoiceCustomerFromContact(contact);
+    }
     toast("Billing contact saved.", "ok");
     closeBillingContactModal();
   }
@@ -2407,6 +2434,43 @@
             status.appendChild(badge);
             booking.appendChild(status);
           }
+          const actions = document.createElement("div");
+          actions.className = "timeline-booking__actions";
+          const doneBtn = document.createElement("button");
+          doneBtn.className = "btn";
+          doneBtn.type = "button";
+          doneBtn.textContent = "Done";
+          doneBtn.disabled = activity.status === "done";
+          doneBtn.addEventListener("click", async () => {
+            if (activity.status === "done") return;
+            try {
+              await updateActivity(activity.id, { status: "done", completed_at: new Date().toISOString() });
+              await refreshTimeline();
+              await refreshActivities();
+            } catch (e) {
+              toast(e.message || String(e), "error");
+            }
+          });
+          const cancelBtn = document.createElement("button");
+          cancelBtn.className = "btn btn-danger";
+          cancelBtn.type = "button";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", async () => {
+            try {
+              const ok = window.confirm("Delete this activity?");
+              if (!ok) return;
+              const { error } = await CN.sb.from("activities").delete().eq("id", activity.id);
+              if (error) throw error;
+              toast("Activity deleted.", "ok");
+              await refreshTimeline();
+              await refreshActivities();
+            } catch (e) {
+              toast(e.message || String(e), "error");
+            }
+          });
+          actions.appendChild(doneBtn);
+          actions.appendChild(cancelBtn);
+          booking.appendChild(actions);
           body.appendChild(booking);
         });
         dayCard.appendChild(body);
@@ -2896,6 +2960,15 @@
     };
   }
 
+  function fillInvoiceCustomerFromContact(contact) {
+    if (!contact) return;
+    if (els.invoiceCustomerName) els.invoiceCustomerName.value = contact.name || "";
+    if (els.invoiceCustomerEmail) els.invoiceCustomerEmail.value = contact.email || "";
+    if (els.invoiceCustomerTaxId) els.invoiceCustomerTaxId.value = contact.tax_id || "";
+    if (els.invoiceCustomerCountry) els.invoiceCustomerCountry.value = contact.country || "";
+    if (els.invoiceCustomerAddress) els.invoiceCustomerAddress.value = contact.address || "";
+  }
+
   function getInvoiceItemRows() {
     if (!els.invoiceItems) return [];
     return Array.from(els.invoiceItems.querySelectorAll(".invoice-item-row"));
@@ -3024,6 +3097,10 @@
     if (els.invoiceIssueDate) els.invoiceIssueDate.value = toDateInputValue(new Date());
     if (els.invoiceNumber) els.invoiceNumber.value = "Auto";
     if (els.invoiceProperty) els.invoiceProperty.value = "";
+    if (els.invoiceBillingContact) {
+      els.invoiceBillingContact.value = "";
+      els.invoiceBillingContact.disabled = false;
+    }
     if (els.invoiceCustomerName) els.invoiceCustomerName.value = "";
     if (els.invoiceCustomerEmail) els.invoiceCustomerEmail.value = "";
     if (els.invoiceCustomerTaxId) els.invoiceCustomerTaxId.value = "";
@@ -3041,20 +3118,46 @@
       populateInvoicePropertySelect();
       els.invoiceProperty.addEventListener("change", () => {
         const propertyId = els.invoiceProperty.value || "";
-        if (!propertyId) return;
+        if (!propertyId) {
+          if (els.invoiceBillingContact) {
+            els.invoiceBillingContact.disabled = false;
+          }
+          return;
+        }
         const prop = getPropertyById(propertyId);
         const contact = prop && prop.billing_contact_id ? getBillingContactById(prop.billing_contact_id) : null;
         if (!contact) {
           toast("Billing contact is required for this property.", "error");
           els.invoiceProperty.value = "";
+          if (els.invoiceBillingContact) {
+            els.invoiceBillingContact.disabled = false;
+          }
           return;
         }
-        if (els.invoiceCustomerName) els.invoiceCustomerName.value = contact.name || "";
-        if (els.invoiceCustomerEmail) els.invoiceCustomerEmail.value = contact.email || "";
-        if (els.invoiceCustomerTaxId) els.invoiceCustomerTaxId.value = contact.tax_id || "";
-        if (els.invoiceCustomerCountry) els.invoiceCustomerCountry.value = contact.country || "";
-        if (els.invoiceCustomerAddress) els.invoiceCustomerAddress.value = contact.address || "";
+        populateInvoiceBillingContactSelect(contact.id);
+        if (els.invoiceBillingContact) {
+          els.invoiceBillingContact.value = contact.id;
+          els.invoiceBillingContact.disabled = true;
+        }
+        fillInvoiceCustomerFromContact(contact);
       });
+    }
+    if (els.invoiceBillingContact) {
+      populateInvoiceBillingContactSelect();
+      els.invoiceBillingContact.addEventListener("change", () => {
+        const contactId = els.invoiceBillingContact.value || "";
+        if (!contactId) return;
+        const contact = getBillingContactById(contactId);
+        if (!contact) return;
+        if (els.invoiceProperty) {
+          els.invoiceProperty.value = "";
+        }
+        els.invoiceBillingContact.disabled = false;
+        fillInvoiceCustomerFromContact(contact);
+      });
+    }
+    if (els.invoiceBillingNewBtn) {
+      els.invoiceBillingNewBtn.addEventListener("click", () => openBillingContactModal(null));
     }
     if (els.invoiceSaveBtn) {
       els.invoiceSaveBtn.addEventListener("click", () => {

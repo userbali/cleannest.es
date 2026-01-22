@@ -222,9 +222,15 @@
 <input class="input" id="invoiceIssueDate" type="date"/>
 <input class="input" disabled="" id="invoiceNumber" placeholder="Auto number"/>
 </div>
+<div class="label" style="margin-top:10px;">Billing contact</div>
+<div class="row" style="gap:8px; align-items:center; flex-wrap:wrap;">
+<select class="input" id="invoiceBillingContact"></select>
+<button class="btn" id="invoiceBillingNewBtn" type="button">New contact</button>
+</div>
+<div class="small-note" style="margin-top:6px;">Selecting a billing contact fills the customer details below.</div>
 <div class="label" style="margin-top:10px;">Property (optional)</div>
 <select class="input" id="invoiceProperty"></select>
-<div class="small-note" style="margin-top:6px;">Auto-fills customer details from the property's billing contact.</div>
+<div class="small-note" style="margin-top:6px;">Selecting a property uses its billing contact.</div>
 <div class="row-2" style="margin-top:10px;">
 <input class="input" id="invoiceCustomerName" placeholder="Customer name"/>
 <input class="input" id="invoiceCustomerEmail" placeholder="Customer email (optional)" type="email"/>
