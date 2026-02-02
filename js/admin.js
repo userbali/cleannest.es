@@ -4035,13 +4035,86 @@
 
   function renderActivities(activities) {
     if (!els.activitiesPanel) return;
-    if (!activities.length) {
-      els.activitiesPanel.innerHTML = '<div class="empty-state"><div class="empty-state__msg">No activities for this month.</div></div>';
-      return;
-    }
     const byDay = groupBy(activities, (a) => a.day_date);
     const sortedDays = Array.from(byDay.keys()).sort();
     els.activitiesPanel.innerHTML = "";
+
+    const typeCard = document.createElement("div");
+    typeCard.className = "card";
+    typeCard.style.marginBottom = "12px";
+    const typeHead = document.createElement("div");
+    typeHead.className = "card-h";
+    typeHead.textContent = "Activity types";
+    const typeBody = document.createElement("div");
+    typeBody.className = "card-b";
+    if (!state.activityTypes.length) {
+      typeBody.innerHTML = '<div class="section-sub" style="margin:0;">No activity types yet.</div>';
+    } else {
+      state.activityTypes.forEach((type) => {
+        const row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.justifyContent = "space-between";
+        row.style.alignItems = "center";
+        row.style.gap = "12px";
+        row.style.padding = "8px 0";
+        row.style.borderBottom = "1px solid rgba(255,255,255,.06)";
+
+        const info = document.createElement("div");
+        const name = document.createElement("div");
+        name.style.fontWeight = "700";
+        name.textContent = type.name || "Type";
+        if (type.color) {
+          const swatch = document.createElement("span");
+          swatch.style.display = "inline-block";
+          swatch.style.width = "10px";
+          swatch.style.height = "10px";
+          swatch.style.borderRadius = "50%";
+          swatch.style.marginRight = "8px";
+          swatch.style.verticalAlign = "middle";
+          swatch.style.background = type.color;
+          name.prepend(swatch);
+        }
+        const sub = document.createElement("div");
+        sub.className = "small-note";
+        sub.textContent = `Default: ${type.default_duration_minutes || 30} min`;
+        info.appendChild(name);
+        info.appendChild(sub);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-danger";
+        delBtn.type = "button";
+        delBtn.textContent = "Delete";
+        delBtn.addEventListener("click", async () => {
+          const ok = window.confirm("Archive this activity type? Existing activities keep their name.");
+          if (!ok) return;
+          try {
+            const { error } = await CN.sb.from("activity_types").update({ is_archived: true }).eq("id", type.id);
+            if (error) throw error;
+            await loadActivityTypes();
+            populateActivityTypeSelect();
+            renderActivities(activities);
+            toast("Activity type archived.", "ok");
+          } catch (e) {
+            toast(e.message || String(e), "error");
+          }
+        });
+
+        row.appendChild(info);
+        row.appendChild(delBtn);
+        typeBody.appendChild(row);
+      });
+    }
+    typeCard.appendChild(typeHead);
+    typeCard.appendChild(typeBody);
+    els.activitiesPanel.appendChild(typeCard);
+
+    if (!activities.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.innerHTML = '<div class="empty-state__msg">No activities for this month.</div>';
+      els.activitiesPanel.appendChild(empty);
+      return;
+    }
 
     sortedDays.forEach((dayKey) => {
       const dayDate = new Date(dayKey + "T00:00:00");
