@@ -32,6 +32,7 @@
     invoiceIssuerText: "",
     selectedPropertyId: null,
     pendingBillingContactPropertyId: null,
+    activityEditing: null,
     activeTab: "properties",
     timeline: {
       month: "",
@@ -222,6 +223,13 @@
 
   function toDateInputValue(date) {
     return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  }
+
+  function toTimeInputValue(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
   }
 
   function toMonthInputValue(date) {
@@ -2540,6 +2548,14 @@
           }
           const actions = document.createElement("div");
           actions.className = "timeline-booking__actions";
+          const detailBtn = document.createElement("button");
+          detailBtn.className = "btn";
+          detailBtn.type = "button";
+          detailBtn.textContent = "Details";
+          detailBtn.addEventListener("click", () => {
+            openActivityModal(activity);
+          });
+          actions.appendChild(detailBtn);
           const doneBtn = document.createElement("button");
           doneBtn.className = "btn";
           doneBtn.type = "button";
@@ -4195,28 +4211,70 @@
     });
   }
 
-  function openActivityModal() {
+  function openActivityModal(activity) {
     if (!els.activityModal) return;
     populateActivityTypeSelect();
     populateActivityStaffSelect();
     populateActivityPropertySelect();
-    if (els.activityCustomName) {
-      els.activityCustomName.value = "";
-      els.activityCustomName.style.display = "none";
+    state.activityEditing = activity || null;
+    if (state.activityEditing) {
+      if (els.activityModalTitle) els.activityModalTitle.textContent = "Activity details";
+      if (els.activityModalHint) els.activityModalHint.textContent = "Update activity details";
+      if (els.activitySave) els.activitySave.textContent = "Update";
+      let selectedTypeId = activity.type_id || "custom";
+      if (selectedTypeId !== "custom" && !state.activityTypes.find((t) => t.id === selectedTypeId)) {
+        selectedTypeId = "custom";
+      }
+      if (els.activityTypeSelect) els.activityTypeSelect.value = selectedTypeId;
+      if (els.activityCustomName) {
+        if (selectedTypeId === "custom") {
+          els.activityCustomName.style.display = "block";
+          els.activityCustomName.value = activity.type_name_snapshot || "";
+        } else {
+          els.activityCustomName.style.display = "none";
+          els.activityCustomName.value = "";
+        }
+      }
+      if (els.activityDate) {
+        els.activityDate.value = activity.day_date || toDateInputValue(new Date());
+      }
+      if (els.activityTimeFrom) {
+        els.activityTimeFrom.value = activity.start_at ? toTimeInputValue(activity.start_at) : "09:00";
+      }
+      if (els.activityDuration) {
+        els.activityDuration.value = String(activity.duration_minutes || 30);
+      }
+      if (els.activityStaff) {
+        els.activityStaff.value = activity.assigned_user_id || "";
+      }
+      if (els.activityProperty) {
+        els.activityProperty.value = activity.property_id || "";
+      }
+      if (els.activityNotes) {
+        els.activityNotes.value = activity.notes || "";
+      }
+    } else {
+      if (els.activityCustomName) {
+        els.activityCustomName.value = "";
+        els.activityCustomName.style.display = "none";
+      }
+      if (els.activityDate) els.activityDate.value = toDateInputValue(new Date());
+      if (els.activityTimeFrom) els.activityTimeFrom.value = "09:00";
+      if (els.activityDuration) els.activityDuration.value = "30";
+      if (els.activityNotes) els.activityNotes.value = "";
+      if (els.activityModalTitle) els.activityModalTitle.textContent = "New activity";
+      if (els.activityModalHint) els.activityModalHint.textContent = "Schedule something custom";
+      if (els.activityTypeSelect) els.activityTypeSelect.value = "custom";
+      if (els.activityCustomName) els.activityCustomName.style.display = "block";
+      if (els.activitySave) els.activitySave.textContent = "Save";
     }
-    if (els.activityDate) els.activityDate.value = toDateInputValue(new Date());
-    if (els.activityTimeFrom) els.activityTimeFrom.value = "09:00";
-    if (els.activityDuration) els.activityDuration.value = "30";
-    if (els.activityNotes) els.activityNotes.value = "";
-    if (els.activityModalTitle) els.activityModalTitle.textContent = "New activity";
-    if (els.activityModalHint) els.activityModalHint.textContent = "Schedule something custom";
-    if (els.activityTypeSelect) els.activityTypeSelect.value = "custom";
-    if (els.activityCustomName) els.activityCustomName.style.display = "block";
     els.activityModal.removeAttribute("hidden");
   }
 
   function closeActivityModal() {
     if (els.activityModal) els.activityModal.setAttribute("hidden", "");
+    state.activityEditing = null;
+    if (els.activitySave) els.activitySave.textContent = "Save";
   }
 
   async function saveActivity() {
@@ -4246,6 +4304,37 @@
     const notes = els.activityNotes ? els.activityNotes.value.trim() : "";
     const color = normalizeHexColor(typeColor);
     const time = els.activityTimeFrom ? els.activityTimeFrom.value : "";
+    const editing = state.activityEditing;
+    if (editing) {
+      const patch = {
+        type_id: typeId === "custom" ? null : typeId,
+        type_name_snapshot: typeName,
+        day_date: day,
+        duration_minutes: duration,
+        assigned_user_id: staffId || null,
+        property_id: propId || null,
+        notes: notes || null
+      };
+      if (color) {
+        patch.color = color;
+      } else {
+        patch.color = null;
+      }
+      if (time) {
+        const start = new Date(`${day}T${time}:00`);
+        patch.start_at = start.toISOString();
+      } else {
+        patch.start_at = null;
+      }
+      const { error } = await CN.sb.from("activities").update(patch).eq("id", editing.id);
+      if (error) throw error;
+      toast("Activity updated.", "ok");
+      closeActivityModal();
+      await refreshActivities();
+      await refreshTimeline();
+      return;
+    }
+
     const payload = {
       tenant_id: tenantId,
       type_id: typeId === "custom" ? null : typeId,
