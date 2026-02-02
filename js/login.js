@@ -49,6 +49,20 @@
 
   const loginBtn = document.getElementById("loginBtn");
   if (loginBtn) loginBtn.addEventListener("click", onSubmit);
+
+  const toggleBtn = document.getElementById("toggleLoginPassword");
+  if (toggleBtn) {
+    const target = document.getElementById("loginPassword") || passEl;
+    if (target) {
+      toggleBtn.addEventListener("click", () => {
+        const isHidden = target.type === "password";
+        target.type = isHidden ? "text" : "password";
+        toggleBtn.setAttribute("aria-pressed", isHidden ? "true" : "false");
+        toggleBtn.title = isHidden ? "Hide password" : "Show password";
+        toggleBtn.textContent = isHidden ? "Hide" : "Show";
+      });
+    }
+  }
 // Optional: Tenant bootstrap (first ever admin after signup)
   // Add a hidden dev helper: if URL has ?bootstrap=1 it will create a tenant+profile for the current auth user.
   // This requires you to sign up first (Supabase Auth) and then open /login.html?bootstrap=1
