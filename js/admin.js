@@ -207,6 +207,16 @@
     billingContactSave: $("billingContactSave")
   };
 
+  function detachActivityModals() {
+    [els.activityTypeModal, els.activityModal].forEach((modal) => {
+      if (!modal) return;
+      const parent = modal.parentElement;
+      if (parent && parent.id === "adminTabActivities") {
+        document.body.appendChild(modal);
+      }
+    });
+  }
+
   function pad2(n) {
     return String(n).padStart(2, "0");
   }
@@ -4763,6 +4773,8 @@
     if (els.logoutBtn) {
       els.logoutBtn.addEventListener("click", () => CN.signOut().catch((e) => toast(e.message || String(e), "error")));
     }
+
+    detachActivityModals();
 
     wireTabs();
     wireAdminTools();
