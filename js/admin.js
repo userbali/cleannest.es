@@ -1434,6 +1434,18 @@
     state.taskLabels = data || [];
   }
 
+  async function seedMissingTaskLabels() {
+    if (state.taskLabels.length) return;
+    const { error } = await CN.sb
+      .from("task_labels")
+      .upsert(
+        { tenant_id: tenantId, name: "Cleaning", color: "#59a14f" },
+        { onConflict: "tenant_id,name" }
+      );
+    if (error) throw error;
+    await loadTaskLabels();
+  }
+
   async function loadModules() {
     const { data, error } = await CN.sb
       .from("tenant_modules")
@@ -1485,6 +1497,11 @@
     await loadProperties();
     await loadPropertyStaff();
     await loadTaskLabels();
+    try {
+      await seedMissingTaskLabels();
+    } catch (e) {
+      toast("Default labels could not be created. Add a task label manually.", "error");
+    }
     try {
       await loadModules();
       await seedMissingModules();
