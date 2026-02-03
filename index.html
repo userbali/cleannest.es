@@ -320,26 +320,12 @@
     </footer>
   </main>
 
-  <div id="gdprBanner" class="gdpr-banner" role="dialog" aria-live="polite" hidden>
-    <div class="gdpr-card">
-      <div class="gdpr-text">
-        <strong data-i18n="gdpr.title">Privacy notice</strong>
-        <p data-i18n="gdpr.text">We use necessary cookies and localStorage to run the site and remember your preferences. No marketing trackers.</p>
-      </div>
-      <div class="gdpr-actions">
-        <a class="btn" href="#privacy" data-i18n="gdpr.learn">Learn more</a>
-        <button class="btn btn-primary" id="gdprAccept" type="button" data-i18n="gdpr.accept">OK</button>
-      </div>
-    </div>
-  </div>
-
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/app-core.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/index-i18n.js"></script>
-  <script src="js/privacy.js"></script>
   <script src="js/login.js"></script>
   <script>
     (function () {
@@ -451,5 +437,6 @@
       });
     })();
   </script>
+  <script src="js/gdpr.js"></script>
 </body>
 </html>
