@@ -2960,64 +2960,64 @@ footer{
 }
 .gdpr-modal__panel {
   position: relative;
-  width: min(720px, 92vw);
-  max-height: 86vh;
+  width: min(420px, 86vw);
+  max-height: 60vh;
   background: #101217;
   color: #f2f3f5;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 20px 20px 18px;
+  border-radius: 10px;
+  padding: 10px 10px 8px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 .gdpr-modal__title {
-  font-size: 18px;
+  font-size: 12px;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
 }
 .gdpr-modal__body {
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 10px;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.86);
-  max-height: 58vh;
+  max-height: 40vh;
   overflow-y: auto;
-  padding-right: 8px;
+  padding-right: 4px;
 }
 .gdpr-modal__body a {
   color: #9ad0ff;
 }
 .gdpr-modal__body h4 {
-  margin: 14px 0 6px;
-  font-size: 14px;
+  margin: 8px 0 3px;
+  font-size: 11px;
   font-weight: 700;
 }
 .gdpr-modal__body h5 {
-  margin: 10px 0 4px;
-  font-size: 13px;
+  margin: 6px 0 2px;
+  font-size: 10px;
   font-weight: 600;
 }
 .gdpr-modal__body ul,
 .gdpr-modal__body ol {
-  margin: 6px 0 10px;
-  padding-left: 18px;
+  margin: 3px 0 6px;
+  padding-left: 14px;
 }
 .gdpr-modal__body li {
-  margin: 4px 0;
+  margin: 2px 0;
 }
 .gdpr-modal__updated {
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 .gdpr-modal__actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 8px;
 }
 .gdpr-modal__fine {
-  margin-top: 10px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 9px;
   color: rgba(255, 255, 255, 0.6);
 }
 .gdpr-no-scroll {
