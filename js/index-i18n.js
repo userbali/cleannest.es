@@ -2,7 +2,7 @@
   "use strict";
 
   const LANG_STORAGE_KEY = "cn:lang:index";
-  const SUPPORTED = ["en", "de", "es", "nb"];
+  const SUPPORTED = ["en", "de", "es", "nb", "hu"];
 
   const TRANSLATIONS = {
     en: {
@@ -407,6 +407,107 @@
       "final.btn": "+34 624 680 309",
 
       "footer.left": "(c) <span id=\"y\"></span> Clean-Nest Eiendomsservice - Gran Canaria"
+    },
+
+    hu: {
+      "meta.title": "Clean-Nest Ingatlankezelés | Gran Canaria",
+      "meta.desc": "Ingatlanfelügyelet, kertgondozás, takarítás és karbantartás Gran Canarián. Megbízható ingatlankezelés WhatsApp támogatással.",
+
+      "nav.services": "Szolgáltatások",
+      "nav.how": "Hogyan működik",
+
+      "cta.whatsappLabel": "WhatsApp:",
+
+      "hero.pill": "<strong>Gran Canaria</strong> - Ingatlanfelügyelet - Kertgondozás - Takarítás",
+      "hero.h1": "Friss, megbízható ingatlankezelés - hogy az otthonod tökéletes legyen, amikor megérkezel.",
+      "hero.sub": "A Clean-Nest tisztán, karbantartva és mindig készen tartja az ingatlanod - átlátható kommunikációval és profi sztenderdekkel.",
+      "hero.cta1": "Írj WhatsAppon",
+      "hero.cta2": "Nézd meg, hogyan működik",
+
+      "svc1.title": "Ingatlanfelügyelet",
+      "svc1.desc": "Kulcskezelés, ellenőrzések, szellőztetés, közművek és nyugalom.",
+      "svc2.title": "Kertgondozás",
+      "svc2.desc": "Egészséges kertek, rendezett szegélyek, szezonális ápolás.",
+      "svc3.title": "Takarítás és karbantartás",
+      "svc3.desc": "Nagytakarítás, felfrissítés és megbízható karbantartási támogatás.",
+
+      "why.hosts.title": "Rövid távú kiadóknak",
+      "why.hosts.sub": "Tedd a kiadásod 5-star élménnyé - anélkül, hogy a szigeten lennél. Kevesebb vendégprobléma, gyorsabb fordulók és mindig készen álló otthon.",
+      "why.hosts.caption": "Gyors forduló takarítás szűk check-out/check-in időkben.",
+      "why.hosts.f1h": "Gyors fordulók",
+      "why.hosts.f1p": "Takarítás, reset, és készen a következő vendégre.",
+      "why.hosts.f2h": "Vendégre kész ellenőrzések",
+      "why.hosts.f2p": "Kulcsok, közművek és bejárás ellenőrizve.",
+      "why.hosts.f3h": "Megjelenés, minőség",
+      "why.hosts.f3p": "A részletek rendben, hogy a fotók és értékelések erősek maradjanak.",
+      "why.hosts.f4h": "Helyi segítség",
+      "why.hosts.f4p": "Szigeten belüli támogatás problémákra és javításokra.",
+      "why.quality.title": "Tiszta, friss és profi kezelés",
+      "why.quality.sub": "Azoknak a tulajdonosoknak, akik állandó minőséget akarnak - egyértelmű sztenderdekkel és megbízható gondoskodással.",
+      "why.box1.h": "Rendszeres ingatlanellenőrzések",
+      "why.box1.p": "Előzd meg a problémákat korán, tervezett ellenőrzésekkel.",
+      "why.box2.h": "Megbízható hozzáférés",
+      "why.box2.p": "Kulcsok és koordináció felelősen kezelve.",
+      "why.box3.h": "Tökéletes megjelenés",
+      "why.box3.p": "Takarítás, ami a magas elvárásokhoz igazodik.",
+      "why.box4.h": "Kert és külső terek",
+      "why.box4.p": "Rendezett, friss kültéri terek egész évben.",
+
+      "how.title": "Hogyan működik",
+      "how.sub": "Egyszerű, gyors és átlátható - WhatsApp kommunikációra építve.",
+      "how.s1": "1. lépés",
+      "how.s1h": "Írj nekünk",
+      "how.s1p": "Mondd el, mire van szükséged és hol található az ingatlan.",
+      "how.s2": "2. lépés",
+      "how.s2h": "Részletek egyeztetése",
+      "how.s2p": "Egyeztetjük a szolgáltatásokat, gyakoriságot és elvárásokat.",
+      "how.s3": "3. lépés",
+      "how.s3h": "Mi intézzük",
+      "how.s3p": "Elvégezzük a munkát és tájékoztatunk.",
+
+      "reviews.title": "Amit a tulajdonosok mondanak",
+      "reviews.sub": "Bizonyítunk.",
+      "reviews.r1h": "5-star: Mindig makulátlan.",
+      "reviews.r1p": "Tökéletes takarítás és gyors WhatsApp válaszok.",
+      "reviews.r2h": "5-star: Megbízható és proaktív.",
+      "reviews.r2p": "Időben észreveszik a problémákat és kézben tartanak mindent.",
+      "reviews.r3h": "5-star: Prémium és friss.",
+      "reviews.r3p": "Pont, amit egy gran canariai otthontól vársz.",
+
+      "faq.title": "GYIK",
+      "faq.sub": "Még kérdésed van? Írj nekünk.",
+      "faq.q1": "Mely területeken dolgoztok?",
+      "faq.a1": "Mogan, Puerto Rico, Arguineguin, Maspalomas, Playa del Ingles, San Agustin, Bahia Feliz, Las Palmas.",
+      "faq.q2": "Vállaltok kulcskezelést?",
+      "faq.a2": "Igen - professzionálisan, egyeztetett hozzáférési szabályokkal.",
+      "faq.q3": "Kaphatok rendszeres frissítést?",
+      "faq.a3": "Igen - WhatsApp frissítés most, automatizált riportok később.",
+
+      "msg.title": "Írj nekünk üzenetet",
+      "msg.sub": "Itt tudsz írni, és e-mailben válaszolunk.",
+      "msg.privacy": "Az adataidat csak a válaszadáshoz használjuk.",
+      "msg.name": "Név",
+      "msg.email": "E-mail",
+      "msg.message": "Üzenet",
+      "msg.send": "Üzenet küldése",
+      "msg.config": "Supabase konfiguráció hiányzik.",
+      "msg.missing": "Kérjük töltsd ki a nevet, e-mailt és üzenetet.",
+      "msg.sending": "Küldés...",
+      "msg.sent": "Üzenet elküldve. Köszönjük.",
+      "msg.failed": "Küldés sikertelen.",
+
+      "gdpr.title": "Adatvédelmi tájékoztató",
+      "gdpr.text": "A webhely működtetéséhez szükséges cookie-kat és localStorage-t használunk. Nincs marketingkövetés.",
+      "gdpr.accept": "OK",
+      "gdpr.learn": "További információ",
+      "privacy.title": "Adatvédelem és GDPR",
+      "privacy.body": "A webhely működtetéséhez szükséges cookie-kat és localStorage-t használunk (nyelv, téma). Nincs marketingkövetés. Ha felveszed velünk a kapcsolatot, adataidat csak a válaszhoz használjuk.",
+
+      "final.title": "Készen állsz egy tisztább, frissebb ingatlanra?",
+      "final.sub": "Írj a Clean-Nestnek WhatsAppon, és intézzük a többit.",
+      "final.btn": "+34 624 680 309",
+
+      "footer.left": "(c) <span id=\"y\"></span> Clean-Nest Ingatlankezelés - Gran Canaria"
     }
   };
 
@@ -426,6 +527,7 @@
     if (s.startsWith("de")) return "de";
     if (s.startsWith("es")) return "es";
     if (s.startsWith("en")) return "en";
+    if (s.startsWith("hu")) return "hu";
     return "en";
   }
 
