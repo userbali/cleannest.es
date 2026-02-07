@@ -69,6 +69,9 @@
       "reviews.r2p": "They notice issues early and keep everything under control.",
       "reviews.r3h": "5-star: Feels premium and fresh.",
       "reviews.r3p": "Exactly what you want for a home in Gran Canaria.",
+      "reviews.card1.text": "I got back my apartment nice and clean. Sofia",
+      "reviews.card2.title": "Leave a review",
+      "reviews.card3.title": "Give us a feedback",
 
       "faq.title": "FAQ",
       "faq.sub": "Still not sure? Contact us.",
@@ -170,6 +173,9 @@
       "reviews.r2p": "Sie erkennen Probleme frueh und behalten alles im Griff.",
       "reviews.r3h": "5-star: Premium und frisch.",
       "reviews.r3p": "Genau das, was man fuer ein Zuhause auf Gran Canaria will.",
+      "reviews.card1.text": "Ich kam zu einer sauberen Wohnung zurueck. Sofia",
+      "reviews.card2.title": "Bewertung hinterlassen",
+      "reviews.card3.title": "Geben Sie uns Feedback",
 
       "faq.title": "FAQ",
       "faq.sub": "Noch unsicher? Kontaktieren Sie uns.",
@@ -271,6 +277,9 @@
       "reviews.r2p": "Detectan problemas pronto y lo mantienen todo bajo control.",
       "reviews.r3h": "5-star: Se siente premium y fresco.",
       "reviews.r3p": "Justo lo que quieres para una casa en Gran Canaria.",
+      "reviews.card1.text": "Volvi y mi apartamento estaba limpio. Sofia",
+      "reviews.card2.title": "Deja una resena",
+      "reviews.card3.title": "Danos tu opinion",
 
       "faq.title": "FAQ",
       "faq.sub": "Aun tienes dudas? Contactanos.",
@@ -372,6 +381,9 @@
       "reviews.r2p": "De oppdager problemer tidlig og har full kontroll.",
       "reviews.r3h": "5-star: Premium og friskt.",
       "reviews.r3p": "Akkurat det du vil ha for et hjem pa Gran Canaria.",
+      "reviews.card1.text": "Jeg kom tilbake til en ren leilighet. Sofia",
+      "reviews.card2.title": "Legg igjen en anmeldelse",
+      "reviews.card3.title": "Gi oss tilbakemelding",
 
       "faq.title": "FAQ",
       "faq.sub": "Usikker? Ta kontakt.",
@@ -427,7 +439,7 @@
       "svc1.title": "Ingatlanfelügyelet",
       "svc1.desc": "Kulcskezelés, rendszeres ellenőrzés.",
       "svc2.title": "Kertgondozás",
-      "svc2.desc": "Egészséges kertek, rendezett szegélyek, szezonális ápolás.",
+      "svc2.desc": "Gondozott kert, rendezett környezet.",
       "svc3.title": "Takarítás és karbantartás",
       "svc3.desc": "Rendszeres takarítás és gondnoki teendők ellátása.",
 
@@ -473,6 +485,9 @@
       "reviews.r2p": "Időben észreveszik a problémákat és kézben tartanak mindent.",
       "reviews.r3h": "5-star: Prémium és friss.",
       "reviews.r3p": "Pont, amit egy gran canariai otthontól vársz.",
+      "reviews.card1.text": "Tisztán kaptam vissza a lakásomat. Sofia",
+      "reviews.card2.title": "Írj értékelést",
+      "reviews.card3.title": "Adj visszajelzést",
 
       "faq.title": "GYIK",
       "faq.sub": "Még kérdésed van? Írj nekünk.",
