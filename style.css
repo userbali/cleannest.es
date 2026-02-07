@@ -504,6 +504,9 @@ a{ color:inherit; text-decoration:none; }
   color: rgba(11,27,43,.9);
   box-shadow: 0 10px 22px rgba(11,27,43,.12);
 }
+.hero .pill strong{
+  color: rgba(11,27,43,.95);
+}
 
 /* Hero */
 .hero{ position:relative; padding: 48px 0 26px; }
