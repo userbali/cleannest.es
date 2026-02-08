@@ -3026,3 +3026,113 @@ footer{
 .gdpr-no-scroll {
   overflow: hidden;
 }
+
+/* =====================
+   Mobile optimizations
+   ===================== */
+@media (max-width: 720px){
+  .wrap{ width: calc(100% - 24px); }
+
+  .header-inner{
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .brand{ width: 100%; min-width: 0; }
+  .brand-title strong{ font-size: 15px; }
+  .brand-title span{ font-size: 10px; letter-spacing: .18em; }
+
+  .cta{
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .lang-switch{
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .lang-btn{
+    flex: 1 0 46px;
+    text-align: center;
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+  .theme-toggle{ width: 100%; }
+  .theme-toggle .btn{ width: 100%; justify-content: center; }
+  .cta .btn{ width: 100%; justify-content: center; }
+
+  .hero{ padding: 28px 0 18px; }
+  .hero-card{ min-height: 0; border-radius: 22px; }
+  .hero-content{ padding: 22px; gap: 16px; }
+  .h1{ font-size: clamp(26px, 7vw, 32px); }
+  .sub{ font-size: 14px; max-width: none; }
+  .pill{ padding: 8px 10px; font-size: 12px; }
+  .hero-actions{ flex-direction: column; }
+  .hero-actions .btn{ width: 100%; justify-content: center; }
+  .service-row{ gap: 10px; }
+  .service{ padding: 12px; }
+  .pictogram-wrap{ width: 38px; height: 38px; }
+  .pictogram{ width: 28px; height: 28px; }
+
+  section{ padding: 36px 0; }
+  .section-title{ font-size: 22px; }
+  .section-sub{ font-size: 14px; margin-bottom: 16px; }
+
+  .card{ padding: 14px; }
+  .portal{ padding: 28px 0 12px; }
+  .portal-top{ flex-direction: column; align-items: flex-start; }
+  .portal-admin-bar{ width: 100%; }
+
+  .admin-tabs{
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .tab-btn{ flex: 0 0 auto; }
+  .schedule-controls,
+  .invoice-controls{
+    position: static;
+    top: auto;
+  }
+  .table-wrap{ -webkit-overflow-scrolling: touch; }
+  .data-table th,
+  .data-table td{ padding: 8px 10px; }
+  .data-table{ min-width: 640px; }
+
+  .timeline-head-controls{
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .timeline-head-group{
+    width: 100%;
+    justify-content: space-between;
+  }
+  .timeline-heatmap{ padding: 8px; }
+  .timeline-heatmap__dow,
+  .timeline-heatmap__grid{ gap: 6px; }
+  .hm-day{ padding: 8px 6px; min-height: 40px; }
+  .hm-day__num,
+  .hm-day__cnt{ font-size: 11px; }
+  .timeline-day__head{
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .timeline-booking__addr{ white-space: normal; }
+  .timeline-booking__actions{ width: 100%; justify-content: flex-start; }
+
+  .invoice-item-head{ display: none; }
+  .invoice-item-row{ grid-template-columns: 1fr 1fr; }
+  .invoice-item-service{ grid-column: 1 / -1; }
+  .invoice-item-total{ grid-column: 1 / -1; }
+  .invoice-item-remove{ grid-column: 1 / -1; justify-self: flex-start; }
+}
+
+@media (max-width: 480px){
+  .wrap{ width: calc(100% - 18px); }
+  .hero-content{ padding: 18px; }
+  .card{ padding: 12px; }
+  .lang-btn{ flex: 1 0 42px; }
+}
