@@ -319,6 +319,34 @@
     el.style.setProperty("--activity-color", normalized);
   }
 
+  function formatDurationLabel(minutes) {
+    const total = Math.max(0, Math.round(Number(minutes) || 0));
+    const days = Math.floor(total / (24 * 60));
+    const rem = total % (24 * 60);
+    const hours = Math.floor(rem / 60);
+    const mins = rem % 60;
+    if (!days && !hours && mins) return `${mins} min`;
+    const parts = [];
+    if (days) parts.push(`${days}d`);
+    if (hours) parts.push(`${hours}h`);
+    if (mins) parts.push(`${mins}m`);
+    return parts.length ? parts.join(" ") : "0m";
+  }
+
+  function ensureDurationOption(selectEl, minutes) {
+    if (!selectEl) return;
+    const value = String(Math.max(0, Math.round(Number(minutes) || 0)));
+    if (!value) return;
+    const existing = Array.from(selectEl.options || []).find((opt) => opt.value === value);
+    if (!existing) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = formatDurationLabel(value);
+      selectEl.appendChild(opt);
+    }
+    selectEl.value = value;
+  }
+
   function getSelectedPaletteColor(name) {
     const selected = document.querySelector(`input[name="${name}"]:checked`);
     return selected ? selected.value : "";
@@ -2673,18 +2701,16 @@
         }
         if (els.plannerScroll) {
           const wheelHandler = (ev) => {
+            if (!els.adminTabPlanner || state.activeTab !== "planner") return;
+            if (!els.adminTabPlanner.contains(ev.target)) return;
             const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
             if (!delta) return;
             els.plannerScroll.scrollLeft += delta;
             state.planner.scrollLeft = els.plannerScroll.scrollLeft;
             state.planner.hasUserScrolled = true;
-            if (Math.abs(ev.deltaY) >= Math.abs(ev.deltaX)) {
-              ev.preventDefault();
-            }
+            ev.preventDefault();
           };
-          [els.plannerScroll, els.plannerTimeline, els.plannerGrid].filter(Boolean).forEach((el) => {
-            el.addEventListener("wheel", wheelHandler, { passive: false });
-          });
+          document.addEventListener("wheel", wheelHandler, { passive: false });
           els.plannerScroll.addEventListener("scroll", () => {
             state.planner.scrollLeft = els.plannerScroll.scrollLeft;
             state.planner.hasUserScrolled = true;
@@ -2714,11 +2740,17 @@
             document.removeEventListener("mouseup", onDragUp);
           };
           els.plannerScroll.addEventListener("mousedown", (ev) => {
-            if (ev.button !== 0) return;
+            if (ev.button !== 0 && ev.button !== 1) return;
             const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
             if (!target || !target.closest) return;
-            if (target.closest(".hz-item")) return;
-            if (target.closest(".hz-row-track")) return;
+            if (ev.button === 0 && !ev.shiftKey && !ev.altKey) {
+              if (target.closest(".hz-item")) return;
+              if (target.closest(".hz-row-track")) return;
+              if (!target.closest(".hz-head") && !target.closest(".hz-days") && !target.closest(".hz-hours")
+                && !target.closest(".hz-col--city") && !target.closest(".hz-col--addr")) {
+                return;
+              }
+            }
             dragState = {
               startX: ev.clientX,
               startScroll: els.plannerScroll.scrollLeft
@@ -2855,16 +2887,12 @@
         return String(a.address || "").localeCompare(String(b.address || ""));
       });
 
-    const activityNoProp = (activities || []).filter((a) => !a.property_id);
-    const rows = props.map((prop) => ({
-      id: prop.id,
-      label: prop.address || "Property",
-      city: prop.city || "",
-      property: prop
-    }));
-    if (activityNoProp.length) {
-      rows.push({ id: "__no_property__", label: "Activities (no property)", property: null });
-    }
+      const rows = props.map((prop) => ({
+        id: prop.id,
+        label: prop.address || "Property",
+        city: prop.city || "",
+        property: prop
+      }));
 
     const cityCol = document.createElement("div");
     cityCol.className = "hz-col hz-col--city";
@@ -2883,16 +2911,11 @@
       cityLabel.className = "hz-row-label";
       const addrLabel = document.createElement("div");
       addrLabel.className = "hz-row-label";
-      if (row.id === "__no_property__") {
-        cityLabel.textContent = "-";
-        addrLabel.textContent = row.label;
-      } else {
         cityLabel.textContent = row.city || "-";
         addrLabel.textContent = row.label;
-      }
-      cityCol.appendChild(cityLabel);
-      addrCol.appendChild(addrLabel);
-    });
+        cityCol.appendChild(cityLabel);
+        addrCol.appendChild(addrLabel);
+      });
 
     const timeCol = document.createElement("div");
     timeCol.className = "hz-col hz-col--time";
@@ -2939,9 +2962,9 @@
       track.style.width = `${totalWidth}px`;
       rowWrap.appendChild(track);
       body.appendChild(rowWrap);
-      rowTracks.set(row.id, track);
-      attachPlannerDrag(track, dayList, dayWidth, hourWidth, row.id === "__no_property__" ? null : row.id);
-    });
+        rowTracks.set(row.id, track);
+        attachPlannerDrag(track, dayList, dayWidth, hourWidth, row.id);
+      });
 
       timeCol.appendChild(body);
       els.plannerGrid.appendChild(cityCol);
@@ -2972,9 +2995,9 @@
       const left = dayIndex * dayWidth + (minutes / 60) * hourWidth;
       const width = Math.max((duration / 60) * hourWidth, 18);
 
-      const rowId = kind === "activity" && !item.property_id ? "__no_property__" : item.property_id;
-      const track = rowTracks.get(rowId);
-      if (!track) return;
+        const rowId = item.property_id;
+        const track = rowTracks.get(rowId);
+        if (!track) return;
 
       const pill = document.createElement("div");
       pill.className = "hz-item";
@@ -3049,9 +3072,18 @@
     }
 
     function formatPlannerPickHint(day, startMinutes, durationMinutes) {
-      const start = toTimeInputValue(startMinutes);
-      const end = toTimeInputValue(startMinutes + durationMinutes);
-      return `${fmtDateLabel(day)} • ${start}–${end}`;
+      const base = new Date(day);
+      base.setHours(0, 0, 0, 0);
+      const startDate = new Date(base.getTime() + startMinutes * 60000);
+      const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+      const startLabel = fmtDateLabel(startDate);
+      const endLabel = fmtDateLabel(endDate);
+      const startTime = toTimeInputValue(startMinutes);
+      const endTime = toTimeInputValue((startMinutes + durationMinutes) % (24 * 60));
+      if (startLabel === endLabel) {
+        return `${startLabel} • ${startTime}–${endTime}`;
+      }
+      return `${startLabel} ${startTime} → ${endLabel} ${endTime}`;
     }
 
     function buildPlannerPickButton({ label, meta, kind, typeId, color }) {
@@ -3134,15 +3166,7 @@
       openTimelineAddModal(day, propertyId || null);
       if (els.timelineAddTime) els.timelineAddTime.value = toTimeInputValue(startMinutes);
       if (els.timelineAddTbd) els.timelineAddTbd.checked = false;
-      if (els.timelineAddDuration) {
-        const options = Array.from(els.timelineAddDuration.options || []).map((opt) => Number(opt.value));
-        if (options.length) {
-          const nearest = options.reduce((best, val) => {
-            return Math.abs(val - durationMinutes) < Math.abs(best - durationMinutes) ? val : best;
-          }, options[0]);
-          els.timelineAddDuration.value = String(nearest);
-        }
-      }
+      ensureDurationOption(els.timelineAddDuration, durationMinutes);
     }
 
     function applyActivityTypeSelection(typeId) {
@@ -3171,7 +3195,7 @@
       applyActivityTypeSelection(typeId || "custom");
       if (els.activityDate) els.activityDate.value = toDateInputValue(day);
       if (els.activityTimeFrom) els.activityTimeFrom.value = toTimeInputValue(startMinutes);
-      if (els.activityDuration) els.activityDuration.value = String(durationMinutes);
+      ensureDurationOption(els.activityDuration, durationMinutes);
       if (els.activityProperty) els.activityProperty.value = propertyId || "";
     }
 
@@ -3200,20 +3224,18 @@
       const x = clampNumber(getX(ev), 0, dragState.maxWidth);
       const start = Math.min(dragState.startX, x);
       let end = Math.max(dragState.startX, x);
-      const startDayIndex = Math.floor(start / dayWidth);
-      const endDayIndex = Math.floor((end - 1) / dayWidth);
-      if (startDayIndex !== endDayIndex) {
-        end = (startDayIndex + 1) * dayWidth - 1;
-      }
-      const day = dayList[startDayIndex];
-      const dayStart = startDayIndex * dayWidth;
-      const startMinutesRaw = ((start - dayStart) / hourWidth) * 60;
-      const endMinutesRaw = ((end - dayStart) / hourWidth) * 60;
-      let startMinutes = Math.round(startMinutesRaw / step) * step;
-      let endMinutes = Math.round(endMinutesRaw / step) * step;
-      if (endMinutes <= startMinutes) endMinutes = startMinutes + 60;
-        startMinutes = clampNumber(startMinutes, 0, 24 * 60 - 1);
-        endMinutes = clampNumber(endMinutes, startMinutes + 30, 24 * 60);
+        const startDayIndex = Math.floor(start / dayWidth);
+        const endDayIndex = Math.floor((end - 1) / dayWidth);
+        const day = dayList[startDayIndex];
+        const dayStart = startDayIndex * dayWidth;
+        const startMinutesRaw = ((start - dayStart) / hourWidth) * 60;
+        const endMinutesRaw = ((end - dayStart) / hourWidth) * 60;
+        let startMinutes = Math.round(startMinutesRaw / step) * step;
+        let endMinutes = Math.round(endMinutesRaw / step) * step;
+        if (endMinutes <= startMinutes) endMinutes = startMinutes + 60;
+        const maxMinutes = dayList.length * 24 * 60;
+        startMinutes = clampNumber(startMinutes, 0, maxMinutes - 1);
+        endMinutes = clampNumber(endMinutes, startMinutes + 30, maxMinutes);
 
         const duration = endMinutes - startMinutes;
         openPlannerPickModal(day, propertyId || null, startMinutes, duration);
@@ -3738,15 +3760,15 @@
     const day = state.timeline.selectedDate;
     const activityTypeId = els.timelineAddActivityType ? els.timelineAddActivityType.value : "";
     const isActivity = Boolean(activityTypeId);
-    const propertyId = els.timelineAddProperty ? (els.timelineAddProperty.value || null) : state.timeline.selectedPropertyId;
-    if (!day) {
-      toast("Select a date.", "error");
-      return;
-    }
-    if (!isActivity && !propertyId) {
-      toast("Select a property.", "error");
-      return;
-    }
+      const propertyId = els.timelineAddProperty ? (els.timelineAddProperty.value || null) : state.timeline.selectedPropertyId;
+      if (!day) {
+        toast("Select a date.", "error");
+        return;
+      }
+      if (!propertyId) {
+        toast("Select a property.", "error");
+        return;
+      }
     const labelId = findDefaultLabelId();
     const duration = els.timelineAddDuration ? Number(els.timelineAddDuration.value || 0) : null;
     const notes = els.timelineAddNotes ? els.timelineAddNotes.value.trim() : "";
@@ -5167,16 +5189,16 @@
     });
   }
 
-  function populateActivityPropertySelect() {
-    if (!els.activityProperty) return;
-    els.activityProperty.innerHTML = "";
-    const none = document.createElement("option");
-    none.value = "";
-    none.textContent = "No property";
-    els.activityProperty.appendChild(none);
-    state.properties.forEach((prop) => {
-      const opt = document.createElement("option");
-      opt.value = prop.id;
+    function populateActivityPropertySelect() {
+      if (!els.activityProperty) return;
+      els.activityProperty.innerHTML = "";
+      const none = document.createElement("option");
+      none.value = "";
+      none.textContent = "Select property";
+      els.activityProperty.appendChild(none);
+      state.properties.forEach((prop) => {
+        const opt = document.createElement("option");
+        opt.value = prop.id;
       opt.textContent = prop.address || "Property";
       els.activityProperty.appendChild(opt);
     });
@@ -5269,13 +5291,17 @@
       toast("Date is required.", "error");
       return;
     }
-    const duration = els.activityDuration ? Number(els.activityDuration.value || 30) : 30;
-    const staffId = els.activityStaff ? els.activityStaff.value : "";
-    const propId = els.activityProperty ? els.activityProperty.value : "";
-    const notes = els.activityNotes ? els.activityNotes.value.trim() : "";
-    const color = normalizeHexColor(typeColor);
-    const time = els.activityTimeFrom ? els.activityTimeFrom.value : "";
-    const editing = state.activityEditing;
+      const duration = els.activityDuration ? Number(els.activityDuration.value || 30) : 30;
+      const staffId = els.activityStaff ? els.activityStaff.value : "";
+      const propId = els.activityProperty ? els.activityProperty.value : "";
+      const notes = els.activityNotes ? els.activityNotes.value.trim() : "";
+      if (!propId) {
+        toast("Property is required.", "error");
+        return;
+      }
+      const color = normalizeHexColor(typeColor);
+      const time = els.activityTimeFrom ? els.activityTimeFrom.value : "";
+      const editing = state.activityEditing;
     if (editing) {
       const patch = {
         type_id: typeId === "custom" ? null : typeId,

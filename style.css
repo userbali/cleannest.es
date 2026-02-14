@@ -2028,7 +2028,7 @@ footer{
   min-width: 0;
 }
 .hz-scroll{
-  overflow-x: auto;
+  overflow-x: scroll;
   overflow-y: hidden;
   width: 100%;
   -webkit-overflow-scrolling: touch;
