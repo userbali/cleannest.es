@@ -2892,20 +2892,23 @@
         }
         if (els.plannerScrollLeft && els.plannerScroll) {
           els.plannerScrollLeft.addEventListener("click", () => {
-            els.plannerScroll.scrollBy({ left: -Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
+            const delta = -Math.max(240, els.plannerScroll.clientWidth * 0.8);
+            els.plannerScroll.scrollLeft += delta;
             state.planner.hasUserScrolled = true;
+            state.planner.scrollLeft = els.plannerScroll.scrollLeft;
           });
         }
         if (els.plannerScrollRight && els.plannerScroll) {
           els.plannerScrollRight.addEventListener("click", () => {
-            els.plannerScroll.scrollBy({ left: Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
+            const delta = Math.max(240, els.plannerScroll.clientWidth * 0.8);
+            els.plannerScroll.scrollLeft += delta;
             state.planner.hasUserScrolled = true;
+            state.planner.scrollLeft = els.plannerScroll.scrollLeft;
           });
         }
         if (els.plannerScroll) {
+          els.plannerScroll.style.overflowX = "auto";
           const wheelHandler = (ev) => {
-            if (!els.adminTabPlanner) return;
-            if (!els.adminTabPlanner.contains(ev.target)) return;
             const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
             if (!delta) return;
             els.plannerScroll.scrollLeft += delta;
@@ -2913,7 +2916,7 @@
             state.planner.hasUserScrolled = true;
             ev.preventDefault();
           };
-          document.addEventListener("wheel", wheelHandler, { passive: false });
+          els.plannerScroll.addEventListener("wheel", wheelHandler, { passive: false });
           els.plannerScroll.addEventListener("scroll", () => {
             state.planner.scrollLeft = els.plannerScroll.scrollLeft;
             state.planner.hasUserScrolled = true;
@@ -2941,6 +2944,7 @@
             els.plannerScroll.classList.remove("is-dragging");
             document.removeEventListener("mousemove", onDragMove);
             document.removeEventListener("mouseup", onDragUp);
+            window.removeEventListener("blur", onDragUp);
           };
           els.plannerScroll.addEventListener("mousedown", (ev) => {
             if (ev.button !== 0 && ev.button !== 1) return;
@@ -2961,6 +2965,7 @@
             els.plannerScroll.classList.add("is-dragging");
             document.addEventListener("mousemove", onDragMove);
             document.addEventListener("mouseup", onDragUp);
+            window.addEventListener("blur", onDragUp);
             ev.preventDefault();
           });
         }
