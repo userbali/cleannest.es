@@ -2045,15 +2045,30 @@ footer{
   align-items: center;
 }
 .hz-row-label{
-  padding: 0 12px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--stroke);
   font-weight: 800;
   font-size: 13px;
   color: var(--text);
   background: var(--surface);
-  height: 44px;
+  height: 52px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+}
+.hz-row-label__city{
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hz-row-label__addr{
+  font-weight: 800;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2115,7 +2130,7 @@ footer{
 .hz-row-track{
   position: relative;
   width: var(--hz-total-width);
-  height: 44px;
+  height: 52px;
   border-bottom: 1px solid var(--stroke);
   cursor: crosshair;
   background:

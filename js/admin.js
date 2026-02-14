@@ -2673,6 +2673,7 @@
     const rows = props.map((prop) => ({
       id: prop.id,
       label: prop.address || "Property",
+      city: prop.city || "",
       property: prop
     }));
     if (activityNoProp.length) {
@@ -2688,7 +2689,18 @@
     rows.forEach((row) => {
       const label = document.createElement("div");
       label.className = "hz-row-label";
-      label.textContent = row.label;
+      if (row.id === "__no_property__") {
+        label.textContent = row.label;
+      } else {
+        const city = document.createElement("div");
+        city.className = "hz-row-label__city";
+        city.textContent = row.city || "—";
+        const addr = document.createElement("div");
+        addr.className = "hz-row-label__addr";
+        addr.textContent = row.label;
+        label.appendChild(city);
+        label.appendChild(addr);
+      }
       labelsCol.appendChild(label);
     });
 
