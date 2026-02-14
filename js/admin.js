@@ -9,6 +9,7 @@
   const MODULE_DEFS = [
     { key: "properties", label: "Properties" },
     { key: "timeline", label: "Timeline" },
+    { key: "planner", label: "Planner" },
     { key: "schedule", label: "Schedule" },
     { key: "activities", label: "Activities" },
     { key: "invoices", label: "Invoices" },
@@ -41,6 +42,9 @@
       selectedPropertyId: null,
       staffTouched: false,
       activities: []
+    },
+    planner: {
+      month: ""
     },
     schedule: {
       month: "",
@@ -88,6 +92,7 @@
     adminTabs: $("adminTabs"),
     adminTabProperties: $("adminTabProperties"),
     adminTabTimeline: $("adminTabTimeline"),
+    adminTabPlanner: $("adminTabPlanner"),
     adminTabSchedule: $("adminTabSchedule"),
     adminTabActivities: $("adminTabActivities"),
     adminTabInvoices: $("adminTabInvoices"),
@@ -105,9 +110,9 @@
     timelineJumpToday: $("timelineJumpToday"),
     timelineHeatmap: $("timelineHeatmap"),
     timelineDays: $("timelineDays"),
-    timelineAddModal: $("timelineAddModal"),
-    timelineAddOwner: $("timelineAddOwner"),
-    timelineAddProperty: $("timelineAddProperty"),
+      timelineAddModal: $("timelineAddModal"),
+      timelineAddOwner: $("timelineAddOwner"),
+      timelineAddProperty: $("timelineAddProperty"),
     timelineAddSearch: $("timelineAddSearch"),
     timelineAddActivityType: $("timelineAddActivityType"),
     timelineAddStaff: $("timelineAddStaff"),
@@ -118,6 +123,12 @@
     timelineAddSave: $("timelineAddSave"),
     timelineAddHint: $("timelineAddHint"),
     timelineAddTitle: $("timelineAddTitle"),
+      plannerMonth: $("plannerMonth"),
+      plannerJumpToday: $("plannerJumpToday"),
+      plannerScrollLeft: $("plannerScrollLeft"),
+      plannerScrollRight: $("plannerScrollRight"),
+      plannerGrid: $("plannerGrid"),
+      plannerScroll: $("plannerScroll"),
     scheduleMonth: $("scheduleMonth"),
     scheduleStatus: $("scheduleStatus"),
     scheduleStaff: $("scheduleStaff"),
@@ -207,15 +218,23 @@
     billingContactSave: $("billingContactSave")
   };
 
-  function detachActivityModals() {
-    [els.activityTypeModal, els.activityModal].forEach((modal) => {
-      if (!modal) return;
-      const parent = modal.parentElement;
-      if (parent && parent.id === "adminTabActivities") {
-        document.body.appendChild(modal);
+    function detachActivityModals() {
+      [els.activityTypeModal, els.activityModal].forEach((modal) => {
+        if (!modal) return;
+        const parent = modal.parentElement;
+        if (parent && parent.id === "adminTabActivities") {
+          document.body.appendChild(modal);
+        }
+      });
+    }
+
+    function detachTimelineModal() {
+      if (!els.timelineAddModal) return;
+      const parent = els.timelineAddModal.parentElement;
+      if (parent && parent.id === "adminTabTimeline") {
+        document.body.appendChild(els.timelineAddModal);
       }
-    });
-  }
+    }
 
   function pad2(n) {
     return String(n).padStart(2, "0");
@@ -348,6 +367,24 @@
       return `${startLabel} - ${fmtTime(d.toISOString())}`;
     }
     return startLabel;
+  }
+
+  function clampNumber(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function minutesFromIso(ts) {
+    if (!ts) return null;
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
+  function toTimeInputValue(minutes) {
+    const safe = clampNumber(minutes, 0, 24 * 60 - 1);
+    const h = String(Math.floor(safe / 60)).padStart(2, "0");
+    const m = String(Math.floor(safe % 60)).padStart(2, "0");
+    return `${h}:${m}`;
   }
 
   function fmtDateTime(ts) {
@@ -757,11 +794,11 @@
     if (taskDetail.modal) taskDetail.modal.setAttribute("hidden", "");
   }
 
-  function ensureTaskDetailModal() {
-    if (taskDetail.modal) return taskDetail;
-    let modal = document.getElementById("taskDetailModal");
-    if (!modal) {
-      modal = document.createElement("div");
+    function ensureTaskDetailModal() {
+      if (taskDetail.modal) return taskDetail;
+      let modal = document.getElementById("taskDetailModal");
+      if (!modal) {
+        modal = document.createElement("div");
       modal.className = "cn-modal";
       modal.id = "taskDetailModal";
       modal.setAttribute("hidden", "");
@@ -831,8 +868,10 @@
           </div>
         </div>
       `;
-      document.body.appendChild(modal);
-    }
+        document.body.appendChild(modal);
+      } else if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
 
     taskDetail.modal = modal;
     taskDetail.title = modal.querySelector("#taskDetailTitle");
@@ -1367,7 +1406,7 @@
   async function loadProperties() {
     const { data, error } = await CN.sb
       .from("properties")
-      .select("id, owner_user_id, address, ownership_type, price, notes, created_at, billing_contact_id, owner:profiles(id, name, email, phone)")
+      .select("*, owner:profiles(id, name, email, phone)")
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -1579,6 +1618,7 @@
   function propertyMatchesSearch(prop, client, query) {
     if (!query) return true;
     const hay = [
+      prop.city,
       prop.address,
       prop.notes,
       client?.name,
@@ -1691,6 +1731,12 @@
         btn.dataset.propId = prop.id;
 
         const col = document.createElement("div");
+        col.className = "cx-prop-row__col";
+        const main = document.createElement("div");
+        main.className = "cx-prop-row__main";
+        const city = document.createElement("div");
+        city.className = "cx-prop-row__city";
+        city.textContent = prop.city || "—";
         const addr = document.createElement("div");
         addr.className = "cx-prop-row__addr";
         addr.textContent = prop.address || "Property";
@@ -1700,7 +1746,9 @@
         const lastLabel = lastStr ? `Last cleaned: ${lastStr}` : "";
         const billingNote = prop.billing_contact_id ? "" : "Billing contact missing";
         sub.textContent = [prop.notes, lastLabel, billingNote].filter(Boolean).join(" | ");
-        col.appendChild(addr);
+        main.appendChild(city);
+        main.appendChild(addr);
+        col.appendChild(main);
         col.appendChild(sub);
 
         btn.appendChild(col);
@@ -1725,12 +1773,23 @@
   }
 
   async function addPropertyForClient(client) {
-    const address = prompt("Property address");
-    if (!address) return;
+    const cityRaw = prompt("City");
+    const city = cityRaw ? cityRaw.trim() : "";
+    if (!city) {
+      toast("City is required.", "error");
+      return;
+    }
+    const addressRaw = prompt("Property address");
+    const address = addressRaw ? addressRaw.trim() : "";
+    if (!address) {
+      toast("Address is required.", "error");
+      return;
+    }
     const notes = prompt("Notes (optional)") || "";
     const { error } = await CN.sb.from("properties").insert({
       tenant_id: tenantId,
       owner_user_id: client.id,
+      city,
       address,
       notes,
       ownership_type: "client_owned"
@@ -1886,26 +1945,130 @@
 
     const preview = document.createElement("div");
     preview.className = "cx-preview";
-    const head = document.createElement("div");
-    head.className = "cx-preview__head";
-    const title = document.createElement("div");
-    title.className = "cx-preview__title";
-    title.textContent = property.address || "Property";
-    const sub = document.createElement("div");
-    sub.className = "cx-preview__sub";
-    sub.textContent = [
-      owner ? owner.name : "Client",
-      owner ? owner.email : "",
-      owner ? owner.phone : ""
-    ].filter(Boolean).join(" | ");
-    head.appendChild(title);
-    head.appendChild(sub);
-    preview.appendChild(head);
+      const head = document.createElement("div");
+      head.className = "cx-preview__head";
+      const headRow = document.createElement("div");
+      headRow.className = "cx-preview__row";
+      const headLeft = document.createElement("div");
+      const title = document.createElement("div");
+      title.className = "cx-preview__title";
+      title.textContent = property.address || "Property";
+      const sub = document.createElement("div");
+      sub.className = "cx-preview__sub";
+      sub.textContent = [
+        owner ? owner.name : "Client",
+        owner ? owner.email : "",
+        owner ? owner.phone : ""
+      ].filter(Boolean).join(" | ");
+      headLeft.appendChild(title);
+      headLeft.appendChild(sub);
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "btn btn-xs";
+      editBtn.textContent = "Edit";
+      headRow.appendChild(headLeft);
+      headRow.appendChild(editBtn);
+      head.appendChild(headRow);
+      preview.appendChild(head);
 
-    const list = document.createElement("div");
-    list.className = "cx-preview__list";
-    const rawNotes = (property.notes || "").trim();
-    const notesText = rawNotes;
+      const editPanel = document.createElement("div");
+      editPanel.className = "cx-preview__edit";
+      editPanel.hidden = true;
+      const editForm = document.createElement("div");
+      editForm.className = "row-2";
+      const cityWrap = document.createElement("div");
+      const cityLabel = document.createElement("div");
+      cityLabel.className = "label";
+      cityLabel.textContent = "City";
+      const cityInput = document.createElement("input");
+      cityInput.className = "input";
+      cityInput.placeholder = "City";
+      cityInput.value = property.city || "";
+      cityWrap.appendChild(cityLabel);
+      cityWrap.appendChild(cityInput);
+      const addrWrap = document.createElement("div");
+      const addrLabel = document.createElement("div");
+      addrLabel.className = "label";
+      addrLabel.textContent = "Address";
+      const addrInput = document.createElement("input");
+      addrInput.className = "input";
+      addrInput.placeholder = "Address";
+      addrInput.value = property.address || "";
+      addrWrap.appendChild(addrLabel);
+      addrWrap.appendChild(addrInput);
+      editForm.appendChild(cityWrap);
+      editForm.appendChild(addrWrap);
+      const editActions = document.createElement("div");
+      editActions.className = "row";
+      editActions.style.justifyContent = "flex-end";
+      editActions.style.gap = "8px";
+      const editCancel = document.createElement("button");
+      editCancel.type = "button";
+      editCancel.className = "btn";
+      editCancel.textContent = "Cancel";
+      const editSave = document.createElement("button");
+      editSave.type = "button";
+      editSave.className = "btn btn-primary";
+      editSave.textContent = "Save";
+      editActions.appendChild(editCancel);
+      editActions.appendChild(editSave);
+      editPanel.appendChild(editForm);
+      editPanel.appendChild(editActions);
+      preview.appendChild(editPanel);
+
+      editBtn.addEventListener("click", () => {
+        editPanel.hidden = !editPanel.hidden;
+        if (!editPanel.hidden) {
+          cityInput.value = property.city || "";
+          addrInput.value = property.address || "";
+        }
+      });
+      editCancel.addEventListener("click", () => {
+        editPanel.hidden = true;
+      });
+      editSave.addEventListener("click", async () => {
+        const nextCity = cityInput.value.trim();
+        const nextAddress = addrInput.value.trim();
+        if (!nextCity) {
+          toast("City is required.", "error");
+          return;
+        }
+        if (!nextAddress) {
+          toast("Address is required.", "error");
+          return;
+        }
+        try {
+          const { error } = await CN.sb
+            .from("properties")
+            .update({ city: nextCity, address: nextAddress })
+            .eq("id", property.id);
+          if (error) throw error;
+          const row = state.properties.find((p) => p.id === property.id);
+          if (row) {
+            row.city = nextCity;
+            row.address = nextAddress;
+          }
+          property.city = nextCity;
+          property.address = nextAddress;
+          toast("Property updated.", "ok");
+          editPanel.hidden = true;
+          renderClientsList();
+          await renderPropertyDetail(property);
+        } catch (e) {
+          toast(e.message || String(e), "error");
+        }
+      });
+      [cityInput, addrInput].forEach((input) => {
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") editSave.click();
+          if (ev.key === "Escape") editCancel.click();
+        });
+      });
+
+      const list = document.createElement("div");
+      list.className = "cx-preview__list";
+      const rawNotes = (property.notes || "").trim();
+      const notesText = rawNotes;
 
     const pricingInline = document.createElement("div");
     pricingInline.className = "pricing-inline";
@@ -2336,6 +2499,86 @@
     }
   }
 
+    function wirePlannerControls() {
+      if (els.plannerMonth) {
+        els.plannerMonth.addEventListener("change", () => {
+          state.planner.month = els.plannerMonth.value || "";
+          refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
+        });
+      }
+      if (els.plannerJumpToday) {
+        els.plannerJumpToday.addEventListener("click", () => {
+          const today = new Date();
+          const monthValue = toMonthInputValue(today);
+          if (els.plannerMonth) {
+            els.plannerMonth.value = monthValue;
+          }
+          state.planner.month = monthValue;
+          refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
+        });
+      }
+      if (els.plannerScrollLeft && els.plannerScroll) {
+        els.plannerScrollLeft.addEventListener("click", () => {
+          els.plannerScroll.scrollBy({ left: -Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
+        });
+      }
+      if (els.plannerScrollRight && els.plannerScroll) {
+        els.plannerScrollRight.addEventListener("click", () => {
+          els.plannerScroll.scrollBy({ left: Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
+        });
+      }
+      if (els.plannerScroll) {
+        els.plannerScroll.addEventListener("wheel", (ev) => {
+          const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+          if (!delta) return;
+          els.plannerScroll.scrollLeft += delta;
+          if (Math.abs(ev.deltaY) >= Math.abs(ev.deltaX)) {
+            ev.preventDefault();
+          }
+        }, { passive: false });
+        els.plannerScroll.addEventListener("keydown", (ev) => {
+          if (ev.key === "ArrowRight") {
+            els.plannerScroll.scrollBy({ left: 200, behavior: "smooth" });
+            ev.preventDefault();
+          }
+          if (ev.key === "ArrowLeft") {
+            els.plannerScroll.scrollBy({ left: -200, behavior: "smooth" });
+            ev.preventDefault();
+          }
+        });
+
+        let dragState = null;
+        const onDragMove = (ev) => {
+          if (!dragState) return;
+          const dx = ev.clientX - dragState.startX;
+          els.plannerScroll.scrollLeft = dragState.startScroll - dx;
+        };
+        const onDragUp = () => {
+          if (!dragState) return;
+          dragState = null;
+          els.plannerScroll.classList.remove("is-dragging");
+          document.removeEventListener("mousemove", onDragMove);
+          document.removeEventListener("mouseup", onDragUp);
+        };
+        els.plannerScroll.addEventListener("mousedown", (ev) => {
+          if (ev.button !== 0) return;
+          const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
+          if (!target || !target.closest) return;
+          if (!target.closest(".hz-head") && !target.closest(".hz-days") && !target.closest(".hz-hours")) {
+            return;
+          }
+          dragState = {
+            startX: ev.clientX,
+            startScroll: els.plannerScroll.scrollLeft
+          };
+          els.plannerScroll.classList.add("is-dragging");
+          document.addEventListener("mousemove", onDragMove);
+          document.addEventListener("mouseup", onDragUp);
+          ev.preventDefault();
+        });
+      }
+    }
+
   async function loadTimelineTasks(startDate, endDate) {
     const { data, error } = await CN.sb
       .from("tasks")
@@ -2372,6 +2615,295 @@
     state.timeline.endDate = monthEnd;
 
     renderTimeline(monthTasks, monthTasks, monthActivities, monthStart, monthEnd);
+  }
+
+  const PLANNER_BLOCK_HOURS = 4;
+  const PLANNER_SLOT_WIDTH = 48;
+  const PLANNER_HOUR_WIDTH = PLANNER_SLOT_WIDTH / PLANNER_BLOCK_HOURS;
+  const PLANNER_STEP_MINUTES = 30;
+
+  async function refreshPlannerTimeline() {
+    if (!els.plannerGrid) return;
+    const today = new Date();
+    const selectedMonth = state.planner.month || (els.plannerMonth ? els.plannerMonth.value : "");
+    const monthDate = fromMonthInputValue(selectedMonth) || today;
+    const monthStart = startOfMonth(monthDate);
+    const monthEnd = endOfMonth(monthDate);
+    const normalizedMonth = toMonthInputValue(monthStart);
+
+    if (els.plannerMonth && els.plannerMonth.value !== normalizedMonth) {
+      els.plannerMonth.value = normalizedMonth;
+    }
+    state.planner.month = normalizedMonth;
+
+    const monthTasks = await loadTimelineTasks(monthStart, monthEnd);
+    const monthActivities = await loadActivities(monthStart, monthEnd);
+    renderPlannerTimeline(monthStart, monthEnd, monthTasks, monthActivities);
+  }
+
+    function renderPlannerTimeline(startDate, endDate, tasks, activities) {
+      if (!els.plannerGrid) return;
+      const dayCount = endDate.getDate();
+      const dayList = [];
+      for (let i = 0; i < dayCount; i += 1) {
+        dayList.push(addDays(startDate, i));
+      }
+      const dayKeys = dayList.map((d) => toDateInputValue(d));
+      const dayIndexByKey = new Map(dayKeys.map((key, idx) => [key, idx]));
+
+      const hourWidth = PLANNER_HOUR_WIDTH;
+      const slotWidth = PLANNER_SLOT_WIDTH;
+      const dayWidth = hourWidth * 24;
+      const totalWidth = dayWidth * dayList.length;
+      const labelWidth = window.matchMedia("(max-width: 720px)").matches ? 160 : 220;
+
+      els.plannerGrid.innerHTML = "";
+      els.plannerGrid.style.setProperty("--hz-hour-width", `${hourWidth}px`);
+      els.plannerGrid.style.setProperty("--hz-slot-width", `${slotWidth}px`);
+      els.plannerGrid.style.setProperty("--hz-day-width", `${dayWidth}px`);
+      els.plannerGrid.style.setProperty("--hz-total-width", `${totalWidth}px`);
+      els.plannerGrid.style.setProperty("--hz-label-width", `${labelWidth}px`);
+      els.plannerGrid.style.width = `${labelWidth + totalWidth}px`;
+
+      const props = [...state.properties].sort((a, b) => {
+        return String(a.address || "").localeCompare(String(b.address || ""));
+      });
+
+    const activityNoProp = (activities || []).filter((a) => !a.property_id);
+    const rows = props.map((prop) => ({
+      id: prop.id,
+      label: prop.address || "Property",
+      property: prop
+    }));
+    if (activityNoProp.length) {
+      rows.push({ id: "__no_property__", label: "Activities (no property)", property: null });
+    }
+
+    const labelsCol = document.createElement("div");
+    labelsCol.className = "hz-col hz-col--labels";
+    const headCell = document.createElement("div");
+    headCell.className = "hz-head-cell";
+    headCell.textContent = "Properties";
+    labelsCol.appendChild(headCell);
+    rows.forEach((row) => {
+      const label = document.createElement("div");
+      label.className = "hz-row-label";
+      label.textContent = row.label;
+      labelsCol.appendChild(label);
+    });
+
+    const timeCol = document.createElement("div");
+    timeCol.className = "hz-col hz-col--time";
+    timeCol.style.width = `${totalWidth}px`;
+
+    const head = document.createElement("div");
+    head.className = "hz-head";
+    const daysRow = document.createElement("div");
+    daysRow.className = "hz-days";
+    daysRow.style.width = `${totalWidth}px`;
+    dayList.forEach((day) => {
+      const cell = document.createElement("div");
+      cell.className = "hz-day";
+      cell.textContent = fmtDateLabel(day);
+      daysRow.appendChild(cell);
+    });
+
+    const hoursRow = document.createElement("div");
+    hoursRow.className = "hz-hours";
+    hoursRow.style.width = `${totalWidth}px`;
+    for (let d = 0; d < dayList.length; d += 1) {
+      for (let h = 0; h < 24; h += PLANNER_BLOCK_HOURS) {
+        const hour = document.createElement("div");
+        hour.className = "hz-hour";
+        hour.textContent = String(h).padStart(2, "0");
+        hoursRow.appendChild(hour);
+      }
+    }
+
+    head.appendChild(daysRow);
+    head.appendChild(hoursRow);
+    timeCol.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "hz-body";
+
+    const rowTracks = new Map();
+    rows.forEach((row) => {
+      const rowWrap = document.createElement("div");
+      rowWrap.className = "hz-row";
+      const track = document.createElement("div");
+      track.className = "hz-row-track";
+      track.dataset.propertyId = row.id;
+      track.style.width = `${totalWidth}px`;
+      rowWrap.appendChild(track);
+      body.appendChild(rowWrap);
+      rowTracks.set(row.id, track);
+      attachPlannerDrag(track, dayList, dayWidth, hourWidth, row.id === "__no_property__" ? null : row.id);
+    });
+
+      timeCol.appendChild(body);
+      els.plannerGrid.appendChild(labelsCol);
+      els.plannerGrid.appendChild(timeCol);
+
+      const headHeight = head.offsetHeight || 0;
+      if (headHeight) {
+        headCell.style.height = `${headHeight}px`;
+      }
+
+    const taskById = new Map((tasks || []).map((task) => [task.id, task]));
+    const activityById = new Map((activities || []).map((activity) => [activity.id, activity]));
+
+    const renderItem = (item, kind) => {
+      const dayKey = item.day_date || (item.start_at ? toDateInputValue(new Date(item.start_at)) : "");
+      const dayIndex = dayIndexByKey.get(dayKey);
+      if (dayIndex == null) return;
+      const duration = Number(item.duration_minutes || 0) || 60;
+      let minutes = minutesFromIso(item.start_at);
+      let isTbd = false;
+      if (minutes == null) {
+        minutes = 9 * 60;
+        isTbd = true;
+      }
+      minutes = clampNumber(minutes, 0, 24 * 60 - 1);
+      const left = dayIndex * dayWidth + (minutes / 60) * hourWidth;
+      const width = Math.max((duration / 60) * hourWidth, 18);
+
+      const rowId = kind === "activity" && !item.property_id ? "__no_property__" : item.property_id;
+      const track = rowTracks.get(rowId);
+      if (!track) return;
+
+      const pill = document.createElement("div");
+      pill.className = "hz-item";
+      pill.style.left = `${left}px`;
+      pill.style.width = `${width}px`;
+      if (item.status === "done") pill.classList.add("is-done");
+      if (item.status === "canceled") pill.classList.add("is-cancelled");
+      if (isTbd) pill.classList.add("is-tbd");
+
+      if (kind === "activity") {
+        applyActivityColor(pill, getActivityColor(item));
+      }
+
+      const label = kind === "activity"
+        ? (item.type_name_snapshot || "Activity")
+        : (getLabelById(item.label_id) || {}).name || "Task";
+      pill.textContent = `${fmtTimeRange(item.start_at, item.end_at, item.duration_minutes)} â€¢ ${label}`;
+      pill.title = pill.textContent;
+
+      pill.dataset.kind = kind;
+      pill.dataset.id = item.id;
+      pill.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (kind === "activity") {
+          openActivityModal(item);
+        } else {
+          openTaskDetail(item.id).catch((e) => toast(e.message || String(e), "error"));
+        }
+      });
+
+      track.appendChild(pill);
+    };
+
+    (tasks || []).forEach((task) => renderItem(task, "task"));
+    (activities || []).forEach((activity) => renderItem(activity, "activity"));
+
+    rowTracks.forEach((track) => {
+      track.addEventListener("click", (ev) => {
+        const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
+        if (!target) return;
+        const pill = target.closest ? target.closest(".hz-item") : null;
+        if (!pill) return;
+        const kind = pill.dataset.kind;
+        const id = pill.dataset.id;
+        if (kind === "activity") {
+          const activity = activityById.get(id);
+          if (activity) openActivityModal(activity);
+        } else {
+          openTaskDetail(id).catch((e) => toast(e.message || String(e), "error"));
+        }
+      });
+    });
+  }
+
+  function attachPlannerDrag(track, dayList, dayWidth, hourWidth, propertyId) {
+    if (!track) return;
+    const step = PLANNER_STEP_MINUTES;
+    let dragState = null;
+
+    const getX = (ev) => {
+      const rect = track.getBoundingClientRect();
+      const scrollLeft = els.plannerScroll ? els.plannerScroll.scrollLeft : 0;
+      return ev.clientX - rect.left + scrollLeft;
+    };
+
+    const onMove = (ev) => {
+      if (!dragState) return;
+      const x = clampNumber(getX(ev), 0, dragState.maxWidth);
+      const start = Math.min(dragState.startX, x);
+      const end = Math.max(dragState.startX, x);
+      dragState.selection.style.left = `${start}px`;
+      dragState.selection.style.width = `${Math.max(end - start, 8)}px`;
+    };
+
+    const onUp = (ev) => {
+      if (!dragState) return;
+      const x = clampNumber(getX(ev), 0, dragState.maxWidth);
+      const start = Math.min(dragState.startX, x);
+      let end = Math.max(dragState.startX, x);
+      const startDayIndex = Math.floor(start / dayWidth);
+      const endDayIndex = Math.floor((end - 1) / dayWidth);
+      if (startDayIndex !== endDayIndex) {
+        end = (startDayIndex + 1) * dayWidth - 1;
+      }
+      const day = dayList[startDayIndex];
+      const dayStart = startDayIndex * dayWidth;
+      const startMinutesRaw = ((start - dayStart) / hourWidth) * 60;
+      const endMinutesRaw = ((end - dayStart) / hourWidth) * 60;
+      let startMinutes = Math.round(startMinutesRaw / step) * step;
+      let endMinutes = Math.round(endMinutesRaw / step) * step;
+      if (endMinutes <= startMinutes) endMinutes = startMinutes + 60;
+      startMinutes = clampNumber(startMinutes, 0, 24 * 60 - 1);
+      endMinutes = clampNumber(endMinutes, startMinutes + 30, 24 * 60);
+
+      const duration = endMinutes - startMinutes;
+      openTimelineAddModal(day, propertyId || null);
+      if (els.timelineAddTime) els.timelineAddTime.value = toTimeInputValue(startMinutes);
+      if (els.timelineAddTbd) els.timelineAddTbd.checked = false;
+      if (els.timelineAddDuration) {
+        const options = Array.from(els.timelineAddDuration.options || []).map((opt) => Number(opt.value));
+        if (options.length) {
+          const nearest = options.reduce((best, val) => {
+            return Math.abs(val - duration) < Math.abs(best - duration) ? val : best;
+          }, options[0]);
+          els.timelineAddDuration.value = String(nearest);
+        }
+      }
+
+      dragState.selection.remove();
+      dragState = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+
+    track.addEventListener("mousedown", (ev) => {
+      if (ev.button !== 0) return;
+      const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
+      if (target && target.closest && target.closest(".hz-item")) return;
+      ev.preventDefault();
+      const startX = clampNumber(getX(ev), 0, track.scrollWidth);
+      const selection = document.createElement("div");
+      selection.className = "hz-selection";
+      selection.style.left = `${startX}px`;
+      selection.style.width = "8px";
+      track.appendChild(selection);
+      dragState = {
+        startX,
+        selection,
+        maxWidth: track.scrollWidth
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
   }
 
   async function openInvoiceFromTimeline(invoiceId) {
@@ -4476,6 +5008,7 @@
     const tabs = {
       properties: els.adminTabProperties,
       timeline: els.adminTabTimeline,
+      planner: els.adminTabPlanner,
       schedule: els.adminTabSchedule,
       activities: els.adminTabActivities,
       invoices: els.adminTabInvoices,
@@ -4493,6 +5026,9 @@
     }
     if (tabKey === "timeline") {
       refreshTimeline().catch((e) => toast(e.message || String(e), "error"));
+    }
+    if (tabKey === "planner") {
+      refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
     }
     if (tabKey === "invoices") {
       refreshInvoices().catch((e) => toast(e.message || String(e), "error"));
@@ -4518,6 +5054,7 @@
       const section = {
         properties: els.adminTabProperties,
         timeline: els.adminTabTimeline,
+        planner: els.adminTabPlanner,
         schedule: els.adminTabSchedule,
         activities: els.adminTabActivities,
         invoices: els.adminTabInvoices,
@@ -4774,11 +5311,13 @@
       els.logoutBtn.addEventListener("click", () => CN.signOut().catch((e) => toast(e.message || String(e), "error")));
     }
 
-    detachActivityModals();
+      detachActivityModals();
+      detachTimelineModal();
 
     wireTabs();
     wireAdminTools();
     wireTimelineControls();
+    wirePlannerControls();
     wireScheduleControls();
     wireActivitiesControls();
     wireInvoiceControls();
@@ -4825,6 +5364,7 @@
     applyModuleVisibility();
 
     await refreshTimeline().catch(() => {});
+    await refreshPlannerTimeline().catch(() => {});
     await refreshSchedule().catch(() => {});
     await refreshActivities().catch(() => {});
 

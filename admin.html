@@ -58,6 +58,7 @@
 <div class="admin-tabs" id="adminTabs">
 <button class="tab-btn is-active" data-action="admin-tab" data-tab="properties" type="button">🏠 Properties</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="timeline" type="button">🗓️ Timeline</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="planner" type="button">🧭 Planner</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="schedule" type="button">📅 Schedule</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="activities" type="button">📝 Activities</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="invoices" type="button">🧾 Invoices</button>
@@ -172,6 +173,29 @@
 <button class="btn btn-primary" id="timelineAddSave" type="button">Create booking</button>
 </div>
 </div>
+</div>
+</div>
+</div>
+<div id="adminTabPlanner" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Planner</h3>
+<p class="section-sub" style="margin:6px 0 0;">Drag across a row to create a booking. Click a booking for details.</p>
+</div>
+<div class="timeline-head-controls">
+<div class="timeline-head-group">
+<input aria-label="Month" class="input" id="plannerMonth" type="month"/>
+</div>
+  <div class="timeline-head-group">
+  <button class="btn" id="plannerJumpToday" type="button">This month</button>
+  <button class="btn" id="plannerScrollLeft" type="button">←</button>
+  <button class="btn" id="plannerScrollRight" type="button">→</button>
+  </div>
+</div>
+</div>
+<div class="hz-timeline" id="plannerTimeline">
+  <div aria-label="Planner timeline" class="hz-scroll" id="plannerScroll" tabindex="0">
+<div class="hz-grid" id="plannerGrid"></div>
 </div>
 </div>
 </div>
