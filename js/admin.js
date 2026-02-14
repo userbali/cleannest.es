@@ -2909,14 +2909,21 @@
         if (els.plannerScroll) {
           els.plannerScroll.style.overflowX = "auto";
           const wheelHandler = (ev) => {
+            if (!els.plannerTimeline) return;
+            const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target && ev.target.parentElement;
+            if (!target || !target.closest) return;
+            if (!target.closest("#plannerTimeline")) return;
             const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
             if (!delta) return;
-            els.plannerScroll.scrollLeft += delta;
+            const before = els.plannerScroll.scrollLeft;
+            els.plannerScroll.scrollLeft = before + delta;
+            if (els.plannerScroll.scrollLeft === before) return;
             state.planner.scrollLeft = els.plannerScroll.scrollLeft;
             state.planner.hasUserScrolled = true;
             ev.preventDefault();
           };
           els.plannerScroll.addEventListener("wheel", wheelHandler, { passive: false });
+          document.addEventListener("wheel", wheelHandler, { passive: false, capture: true });
           els.plannerScroll.addEventListener("scroll", () => {
             state.planner.scrollLeft = els.plannerScroll.scrollLeft;
             state.planner.hasUserScrolled = true;
