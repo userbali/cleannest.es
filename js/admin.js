@@ -2655,15 +2655,19 @@
       const slotWidth = PLANNER_SLOT_WIDTH;
       const dayWidth = hourWidth * 24;
       const totalWidth = dayWidth * dayList.length;
-      const labelWidth = window.matchMedia("(max-width: 720px)").matches ? 160 : 220;
+      const isNarrow = window.matchMedia("(max-width: 720px)").matches;
+      const cityWidth = isNarrow ? 90 : 120;
+      const addressWidth = isNarrow ? 160 : 220;
+      const labelTotalWidth = cityWidth + addressWidth;
 
       els.plannerGrid.innerHTML = "";
       els.plannerGrid.style.setProperty("--hz-hour-width", `${hourWidth}px`);
       els.plannerGrid.style.setProperty("--hz-slot-width", `${slotWidth}px`);
       els.plannerGrid.style.setProperty("--hz-day-width", `${dayWidth}px`);
       els.plannerGrid.style.setProperty("--hz-total-width", `${totalWidth}px`);
-      els.plannerGrid.style.setProperty("--hz-label-width", `${labelWidth}px`);
-      els.plannerGrid.style.width = `${labelWidth + totalWidth}px`;
+      els.plannerGrid.style.setProperty("--hz-city-width", `${cityWidth}px`);
+      els.plannerGrid.style.setProperty("--hz-address-width", `${addressWidth}px`);
+      els.plannerGrid.style.width = `${labelTotalWidth + totalWidth}px`;
 
       const props = [...state.properties].sort((a, b) => {
         return String(a.address || "").localeCompare(String(b.address || ""));
@@ -2680,42 +2684,32 @@
       rows.push({ id: "__no_property__", label: "Activities (no property)", property: null });
     }
 
-    const labelsCol = document.createElement("div");
-    labelsCol.className = "hz-col hz-col--labels";
-    const headCell = document.createElement("div");
-    headCell.className = "hz-head-cell";
-    const headGrid = document.createElement("div");
-    headGrid.className = "hz-row-label__grid";
-    const headCity = document.createElement("div");
-    headCity.className = "hz-row-label__city";
-    headCity.textContent = "City";
-    const headAddr = document.createElement("div");
-    headAddr.className = "hz-row-label__addr";
-    headAddr.textContent = "Address";
-    headGrid.appendChild(headCity);
-    headGrid.appendChild(headAddr);
-    headCell.appendChild(headGrid);
-    labelsCol.appendChild(headCell);
+    const cityCol = document.createElement("div");
+    cityCol.className = "hz-col hz-col--city";
+    const addrCol = document.createElement("div");
+    addrCol.className = "hz-col hz-col--addr";
+    const cityHead = document.createElement("div");
+    cityHead.className = "hz-head-cell";
+    cityHead.textContent = "City";
+    const addrHead = document.createElement("div");
+    addrHead.className = "hz-head-cell";
+    addrHead.textContent = "Address";
+    cityCol.appendChild(cityHead);
+    addrCol.appendChild(addrHead);
     rows.forEach((row) => {
-      const label = document.createElement("div");
-      label.className = "hz-row-label";
-      const grid = document.createElement("div");
-      grid.className = "hz-row-label__grid";
-      const city = document.createElement("div");
-      city.className = "hz-row-label__city";
-      const addr = document.createElement("div");
-      addr.className = "hz-row-label__addr";
+      const cityLabel = document.createElement("div");
+      cityLabel.className = "hz-row-label";
+      const addrLabel = document.createElement("div");
+      addrLabel.className = "hz-row-label";
       if (row.id === "__no_property__") {
-        city.textContent = "—";
-        addr.textContent = row.label;
+        cityLabel.textContent = "-";
+        addrLabel.textContent = row.label;
       } else {
-        city.textContent = row.city || "—";
-        addr.textContent = row.label;
+        cityLabel.textContent = row.city || "-";
+        addrLabel.textContent = row.label;
       }
-      grid.appendChild(city);
-      grid.appendChild(addr);
-      label.appendChild(grid);
-      labelsCol.appendChild(label);
+      cityCol.appendChild(cityLabel);
+      addrCol.appendChild(addrLabel);
     });
 
     const timeCol = document.createElement("div");
@@ -2768,12 +2762,14 @@
     });
 
       timeCol.appendChild(body);
-      els.plannerGrid.appendChild(labelsCol);
+      els.plannerGrid.appendChild(cityCol);
+      els.plannerGrid.appendChild(addrCol);
       els.plannerGrid.appendChild(timeCol);
 
       const headHeight = head.offsetHeight || 0;
       if (headHeight) {
-        headCell.style.height = `${headHeight}px`;
+        cityHead.style.height = `${headHeight}px`;
+        addrHead.style.height = `${headHeight}px`;
       }
 
     const taskById = new Map((tasks || []).map((task) => [task.id, task]));
