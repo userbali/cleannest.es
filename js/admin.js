@@ -67,6 +67,17 @@
     meta: null,
     checklist: null,
     checklistHint: null,
+    setupList: null,
+    setupHint: null,
+    rescheduleCard: null,
+    rescheduleDate: null,
+    rescheduleTime: null,
+    rescheduleDuration: null,
+    rescheduleTbd: null,
+    rescheduleSave: null,
+    rescheduleCancel: null,
+    rescheduleBtn: null,
+    deleteBtn: null,
     refGallery: null,
     workGallery: null,
     refUploadBtn: null,
@@ -271,8 +282,17 @@
   }
 
   function toTimeInputValue(value) {
-    if (!value) return "";
-    const date = new Date(value);
+    if (value == null || value === "") return "";
+    const numeric = typeof value === "number"
+      ? value
+      : (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : null);
+    if (Number.isFinite(numeric)) {
+      const safe = clampNumber(numeric, 0, 24 * 60 - 1);
+      const h = String(Math.floor(safe / 60)).padStart(2, "0");
+      const m = String(Math.floor(safe % 60)).padStart(2, "0");
+      return `${h}:${m}`;
+    }
+    const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return "";
     return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
   }
@@ -345,6 +365,20 @@
       selectEl.appendChild(opt);
     }
     selectEl.value = value;
+  }
+
+  function getTaskDurationMinutes(task) {
+    const raw = Number(task && task.duration_minutes);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    if (task && task.start_at && task.end_at) {
+      const start = new Date(task.start_at);
+      const end = new Date(task.end_at);
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        const diff = Math.round((end.getTime() - start.getTime()) / 60000);
+        if (diff > 0) return diff;
+      }
+    }
+    return 120;
   }
 
   function getSelectedPaletteColor(name) {
@@ -434,13 +468,6 @@
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return null;
     return d.getHours() * 60 + d.getMinutes();
-  }
-
-  function toTimeInputValue(minutes) {
-    const safe = clampNumber(minutes, 0, 24 * 60 - 1);
-    const h = String(Math.floor(safe / 60)).padStart(2, "0");
-    const m = String(Math.floor(safe % 60)).padStart(2, "0");
-    return `${h}:${m}`;
   }
 
   function fmtDateTime(ts) {
@@ -850,6 +877,11 @@
 
   function closeTaskDetailModal() {
     if (taskDetail.modal) taskDetail.modal.setAttribute("hidden", "");
+    closeTaskRescheduleCard();
+  }
+
+  function closeTaskRescheduleCard() {
+    if (taskDetail.rescheduleCard) taskDetail.rescheduleCard.setAttribute("hidden", "");
   }
 
     function ensureTaskDetailModal() {
@@ -870,17 +902,60 @@
             </div>
             <button class="btn" data-action="task-detail-close" type="button">Close</button>
           </div>
-          <div class="form" style="margin-top:10px;">
-            <div class="card">
-              <div class="row" style="justify-content:space-between; align-items:center;">
-                <h3 style="margin:0;">Checklist</h3>
-                <span class="small-note" id="taskChecklistHint"></span>
+            <div class="form" style="margin-top:10px;">
+              <div class="card" id="taskRescheduleCard" hidden>
+                <div class="row" style="justify-content:space-between; align-items:center;">
+                  <h3 style="margin:0;">Reschedule</h3>
+                  <span class="small-note">Update date & time</span>
+                </div>
+                <div class="row-2" style="margin-top:10px;">
+                  <div>
+                    <div class="label">Date</div>
+                    <input class="input" id="taskRescheduleDate" type="date"/>
+                  </div>
+                  <div>
+                    <div class="label">Start time</div>
+                    <input class="input" id="taskRescheduleTime" type="time" value="09:00"/>
+                  </div>
+                </div>
+                <div style="margin-top:10px;">
+                  <div class="label">Duration</div>
+                  <select class="input" id="taskRescheduleDuration">
+                    <option value="60">1h</option>
+                    <option value="90">1h 30m</option>
+                    <option selected="" value="120">2h</option>
+                    <option value="180">3h</option>
+                    <option value="240">4h</option>
+                  </select>
+                </div>
+                <div style="margin-top:10px;">
+                  <label class="chip-check">
+                    <input id="taskRescheduleTbd" type="checkbox"/>
+                    <span>Time TBD (save without time)</span>
+                  </label>
+                </div>
+                <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px;">
+                  <button class="btn btn-primary" id="taskRescheduleSave" type="button">Save</button>
+                  <button class="btn" id="taskRescheduleCancel" type="button">Close</button>
+                </div>
               </div>
-              <div class="checklist" id="taskChecklistList"></div>
-            </div>
-            <div class="card">
-              <div class="row" style="justify-content:space-between; align-items:center;">
-                <h3 style="margin:0;">Pricing</h3>
+              <div class="card">
+                <div class="row" style="justify-content:space-between; align-items:center;">
+                  <h3 style="margin:0;">Checklist</h3>
+                  <span class="small-note" id="taskChecklistHint"></span>
+                </div>
+                <div class="checklist" id="taskChecklistList"></div>
+              </div>
+              <div class="card">
+                <div class="row" style="justify-content:space-between; align-items:center;">
+                  <h3 style="margin:0;">Setup</h3>
+                  <span class="small-note" id="taskSetupHint"></span>
+                </div>
+                <div class="checklist" id="taskSetupList"></div>
+              </div>
+              <div class="card">
+                <div class="row" style="justify-content:space-between; align-items:center;">
+                  <h3 style="margin:0;">Pricing</h3>
                 <span class="small-note" id="taskPriceMeta"></span>
               </div>
               <div style="margin-top:8px;">
@@ -920,8 +995,10 @@
               <button class="btn" id="taskDoneBtn" type="button">Done</button>
               <button class="btn" id="taskEmailBtn" type="button">Send email</button>
               <button class="btn" id="taskInvoiceBtn" type="button">Create invoice</button>
+              <button class="btn" id="taskRescheduleBtn" type="button">Reschedule</button>
               <button class="btn" id="taskCancelBtn" type="button">Cancel</button>
               <button class="btn" id="taskReopenBtn" type="button">Reopen</button>
+              <button class="btn btn-danger" id="taskDeleteBtn" type="button">Delete</button>
             </div>
           </div>
         </div>
@@ -931,12 +1008,14 @@
         document.body.appendChild(modal);
       }
 
-    taskDetail.modal = modal;
-    taskDetail.title = modal.querySelector("#taskDetailTitle");
-    taskDetail.meta = modal.querySelector("#taskDetailMeta");
-    taskDetail.checklist = modal.querySelector("#taskChecklistList");
-    taskDetail.checklistHint = modal.querySelector("#taskChecklistHint");
-    taskDetail.refGallery = modal.querySelector("#taskRefGallery");
+      taskDetail.modal = modal;
+      taskDetail.title = modal.querySelector("#taskDetailTitle");
+      taskDetail.meta = modal.querySelector("#taskDetailMeta");
+      taskDetail.checklist = modal.querySelector("#taskChecklistList");
+      taskDetail.checklistHint = modal.querySelector("#taskChecklistHint");
+      taskDetail.setupList = modal.querySelector("#taskSetupList");
+      taskDetail.setupHint = modal.querySelector("#taskSetupHint");
+      taskDetail.refGallery = modal.querySelector("#taskRefGallery");
     taskDetail.workGallery = modal.querySelector("#taskWorkGallery");
     taskDetail.refUploadBtn = modal.querySelector("#taskRefUpload");
     taskDetail.workUploadBtn = modal.querySelector("#taskWorkUpload");
@@ -953,6 +1032,15 @@
     taskDetail.addOnAmount = modal.querySelector("#taskAddOnAmount");
     taskDetail.addOnAddBtn = modal.querySelector("#taskAddOnAdd");
     taskDetail.addOnTotal = modal.querySelector("#taskAddOnTotal");
+    taskDetail.rescheduleCard = modal.querySelector("#taskRescheduleCard");
+    taskDetail.rescheduleDate = modal.querySelector("#taskRescheduleDate");
+    taskDetail.rescheduleTime = modal.querySelector("#taskRescheduleTime");
+    taskDetail.rescheduleDuration = modal.querySelector("#taskRescheduleDuration");
+    taskDetail.rescheduleTbd = modal.querySelector("#taskRescheduleTbd");
+    taskDetail.rescheduleSave = modal.querySelector("#taskRescheduleSave");
+    taskDetail.rescheduleCancel = modal.querySelector("#taskRescheduleCancel");
+    taskDetail.rescheduleBtn = modal.querySelector("#taskRescheduleBtn");
+    taskDetail.deleteBtn = modal.querySelector("#taskDeleteBtn");
 
     taskDetail.refInput = document.createElement("input");
     taskDetail.refInput.type = "file";
@@ -1046,6 +1134,94 @@
           .catch((e) => toast(e.message || String(e), "error"));
       });
     }
+    if (taskDetail.rescheduleBtn) {
+      taskDetail.rescheduleBtn.addEventListener("click", () => {
+        const task = taskDetail.currentTask;
+        if (!task) return;
+        const day = task.day_date || (task.start_at ? toDateInputValue(new Date(task.start_at)) : toDateInputValue(new Date()));
+        if (taskDetail.rescheduleDate) taskDetail.rescheduleDate.value = day;
+        const duration = getTaskDurationMinutes(task);
+        ensureDurationOption(taskDetail.rescheduleDuration, duration);
+        const minutes = minutesFromIso(task.start_at);
+        const hasTime = Number.isFinite(minutes);
+        if (taskDetail.rescheduleTime) {
+          taskDetail.rescheduleTime.value = hasTime ? toTimeInputValue(minutes) : "09:00";
+        }
+        if (taskDetail.rescheduleTbd && taskDetail.rescheduleTime) {
+          taskDetail.rescheduleTbd.checked = !hasTime;
+          taskDetail.rescheduleTime.disabled = !hasTime;
+        }
+        if (taskDetail.rescheduleCard) taskDetail.rescheduleCard.removeAttribute("hidden");
+      });
+    }
+    if (taskDetail.rescheduleCancel) {
+      taskDetail.rescheduleCancel.addEventListener("click", () => {
+        closeTaskRescheduleCard();
+      });
+    }
+    if (taskDetail.rescheduleTbd && taskDetail.rescheduleTime) {
+      taskDetail.rescheduleTbd.addEventListener("change", () => {
+        taskDetail.rescheduleTime.disabled = taskDetail.rescheduleTbd.checked;
+      });
+    }
+    if (taskDetail.rescheduleSave) {
+      taskDetail.rescheduleSave.addEventListener("click", () => {
+        const task = taskDetail.currentTask;
+        if (!task) return;
+        const day = taskDetail.rescheduleDate ? taskDetail.rescheduleDate.value : "";
+        if (!day) {
+          toast("Date is required.", "error");
+          return;
+        }
+        const durationRaw = taskDetail.rescheduleDuration ? Number(taskDetail.rescheduleDuration.value || 0) : 0;
+        const duration = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.round(durationRaw) : null;
+        const tbd = taskDetail.rescheduleTbd ? taskDetail.rescheduleTbd.checked : false;
+        const time = taskDetail.rescheduleTime ? taskDetail.rescheduleTime.value : "";
+        if (!tbd && !time) {
+          toast("Select a start time or enable Time TBD.", "error");
+          return;
+        }
+        const patch = {
+          day_date: day,
+          duration_minutes: duration
+        };
+        if (tbd) {
+          patch.start_at = null;
+          patch.end_at = null;
+        } else {
+          const start = new Date(`${day}T${time}:00`);
+          patch.start_at = start.toISOString();
+          if (duration) {
+            const end = new Date(start.getTime() + duration * 60000);
+            patch.end_at = end.toISOString();
+          } else {
+            patch.end_at = null;
+          }
+        }
+        updateTask(task.id, patch)
+          .then(async () => {
+            closeTaskRescheduleCard();
+            await refreshTaskViews();
+            await openTaskDetail(task.id);
+          })
+          .catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (taskDetail.deleteBtn) {
+      taskDetail.deleteBtn.addEventListener("click", () => {
+        const task = taskDetail.currentTask;
+        if (!task) return;
+        if (!window.confirm("Delete this booking? This cannot be undone.")) return;
+        CN.sb.from("tasks").delete().eq("id", task.id)
+          .then(async ({ error }) => {
+            if (error) throw error;
+            toast("Booking deleted.", "ok");
+            closeTaskDetailModal();
+            await refreshTaskViews();
+          })
+          .catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
 
     if (taskDetail.priceSaveBtn) {
       taskDetail.priceSaveBtn.addEventListener("click", () => {
@@ -1133,6 +1309,12 @@
     taskDetail.doneBtn.style.display = isCanceled ? "none" : "";
     taskDetail.cancelBtn.style.display = isDone || isCanceled ? "none" : "";
     taskDetail.reopenBtn.style.display = isDone || isCanceled ? "" : "none";
+    if (taskDetail.rescheduleBtn) {
+      taskDetail.rescheduleBtn.style.display = isDone || isCanceled ? "none" : "";
+    }
+    if (taskDetail.deleteBtn) {
+      taskDetail.deleteBtn.style.display = "";
+    }
     taskDetail.doneBtn.disabled = isDone;
     taskDetail.doneBtn.classList.toggle("is-success", isDone);
     taskDetail.doneBtn.textContent = isDone ? "Completed" : "Done";
@@ -1188,6 +1370,7 @@
       : await loadTaskDetail(taskOrId.id);
 
     detail.currentTask = task;
+    closeTaskRescheduleCard();
 
     const prop = getPropertyById(task.property_id) || task.property;
     const label = getLabelById(task.label_id);
@@ -1203,28 +1386,48 @@
     }
 
     await ensureTaskChecklist(task.id, task.property_id);
-    const checklistItems = await loadTaskChecklistItems(task.id);
-    const checklistStats = renderTaskChecklist(detail.checklist, checklistItems, async (item, done, labelEl, inputEl) => {
-      try {
-        await updateTaskChecklistItem(item.id, done);
-        item.done = done;
-        if (labelEl) labelEl.classList.toggle("done", done);
-        const counts = checklistItems.reduce((acc, row) => {
+      const checklistItems = await loadTaskChecklistItems(task.id);
+      const setupItems = checklistItems.filter((item) => isSetupLabel(item.label));
+      const normalItems = checklistItems.filter((item) => !isSetupLabel(item.label));
+
+      const updateChecklistHints = () => {
+        const normalCounts = normalItems.reduce((acc, row) => {
+          if (row.done) acc.done += 1;
+          acc.total += 1;
+          return acc;
+        }, { done: 0, total: 0 });
+        const setupCounts = setupItems.reduce((acc, row) => {
           if (row.done) acc.done += 1;
           acc.total += 1;
           return acc;
         }, { done: 0, total: 0 });
         if (detail.checklistHint) {
-          detail.checklistHint.textContent = counts.total ? `${counts.done}/${counts.total} done` : "No checklist items yet.";
+          detail.checklistHint.textContent = normalCounts.total
+            ? `${normalCounts.done}/${normalCounts.total} done`
+            : "No checklist items yet.";
         }
-      } catch (e) {
-        if (inputEl) inputEl.checked = !done;
-        toast(e.message || String(e), "error");
-      }
-    });
-    if (detail.checklistHint) {
-      detail.checklistHint.textContent = checklistStats.total ? `${checklistStats.done}/${checklistStats.total} done` : "No checklist items yet.";
-    }
+        if (detail.setupHint) {
+          detail.setupHint.textContent = setupCounts.total
+            ? `${setupCounts.done}/${setupCounts.total} done`
+            : "No setup items yet.";
+        }
+      };
+
+      const handleChecklistToggle = async (item, done, labelEl, inputEl) => {
+        try {
+          await updateTaskChecklistItem(item.id, done);
+          item.done = done;
+          if (labelEl) labelEl.classList.toggle("done", done);
+          updateChecklistHints();
+        } catch (e) {
+          if (inputEl) inputEl.checked = !done;
+          toast(e.message || String(e), "error");
+        }
+      };
+
+      renderTaskChecklist(detail.checklist, normalItems, handleChecklistToggle);
+      renderTaskChecklist(detail.setupList, setupItems, handleChecklistToggle);
+      updateChecklistHints();
 
     if (taskDetail.addOnLabel) taskDetail.addOnLabel.value = "";
     if (taskDetail.addOnAmount) taskDetail.addOnAmount.value = "";
@@ -2701,7 +2904,7 @@
         }
         if (els.plannerScroll) {
           const wheelHandler = (ev) => {
-            if (!els.adminTabPlanner || state.activeTab !== "planner") return;
+            if (!els.adminTabPlanner) return;
             if (!els.adminTabPlanner.contains(ev.target)) return;
             const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
             if (!delta) return;
