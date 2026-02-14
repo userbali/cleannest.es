@@ -2684,23 +2684,37 @@
     labelsCol.className = "hz-col hz-col--labels";
     const headCell = document.createElement("div");
     headCell.className = "hz-head-cell";
-    headCell.textContent = "Properties";
+    const headGrid = document.createElement("div");
+    headGrid.className = "hz-row-label__grid";
+    const headCity = document.createElement("div");
+    headCity.className = "hz-row-label__city";
+    headCity.textContent = "City";
+    const headAddr = document.createElement("div");
+    headAddr.className = "hz-row-label__addr";
+    headAddr.textContent = "Address";
+    headGrid.appendChild(headCity);
+    headGrid.appendChild(headAddr);
+    headCell.appendChild(headGrid);
     labelsCol.appendChild(headCell);
     rows.forEach((row) => {
       const label = document.createElement("div");
       label.className = "hz-row-label";
+      const grid = document.createElement("div");
+      grid.className = "hz-row-label__grid";
+      const city = document.createElement("div");
+      city.className = "hz-row-label__city";
+      const addr = document.createElement("div");
+      addr.className = "hz-row-label__addr";
       if (row.id === "__no_property__") {
-        label.textContent = row.label;
-      } else {
-        const city = document.createElement("div");
-        city.className = "hz-row-label__city";
-        city.textContent = row.city || "—";
-        const addr = document.createElement("div");
-        addr.className = "hz-row-label__addr";
+        city.textContent = "—";
         addr.textContent = row.label;
-        label.appendChild(city);
-        label.appendChild(addr);
+      } else {
+        city.textContent = row.city || "—";
+        addr.textContent = row.label;
       }
+      grid.appendChild(city);
+      grid.appendChild(addr);
+      label.appendChild(grid);
       labelsCol.appendChild(label);
     });
 
