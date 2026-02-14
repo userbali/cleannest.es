@@ -2026,6 +2026,7 @@ footer{
   background: var(--surface);
   overflow: hidden;
   min-width: 0;
+  max-width: 100%;
 }
 .hz-scroll{
   overflow-x: scroll;
@@ -2038,6 +2039,14 @@ footer{
   touch-action: pan-x;
   cursor: grab;
   overscroll-behavior-x: contain;
+}
+#adminTabPlanner{
+  min-width: 0;
+}
+#plannerTimeline,
+#plannerScroll{
+  min-width: 0;
+  max-width: 100%;
 }
 .hz-scroll.is-dragging{
   cursor: grabbing;

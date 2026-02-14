@@ -381,6 +381,20 @@
     return 120;
   }
 
+  function getPlannerScroller() {
+    if (els.plannerScroll) {
+      const sw = Number(els.plannerScroll.scrollWidth || 0);
+      const cw = Number(els.plannerScroll.clientWidth || 0);
+      if (sw > cw + 1) return els.plannerScroll;
+    }
+    if (els.plannerTimeline) {
+      const sw = Number(els.plannerTimeline.scrollWidth || 0);
+      const cw = Number(els.plannerTimeline.clientWidth || 0);
+      if (sw > cw + 1) return els.plannerTimeline;
+    }
+    return els.plannerScroll || els.plannerTimeline || null;
+  }
+
   function getSelectedPaletteColor(name) {
     const selected = document.querySelector(`input[name="${name}"]:checked`);
     return selected ? selected.value : "";
@@ -2890,70 +2904,87 @@
             refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
           });
         }
-        if (els.plannerScrollLeft && els.plannerScroll) {
+        if (els.plannerScrollLeft) {
           els.plannerScrollLeft.addEventListener("click", () => {
-            const delta = -Math.max(240, els.plannerScroll.clientWidth * 0.8);
-            els.plannerScroll.scrollLeft += delta;
+            const scroller = getPlannerScroller();
+            if (!scroller) return;
+            const delta = -Math.max(240, scroller.clientWidth * 0.8);
+            scroller.scrollLeft += delta;
             state.planner.hasUserScrolled = true;
-            state.planner.scrollLeft = els.plannerScroll.scrollLeft;
+            state.planner.scrollLeft = scroller.scrollLeft;
           });
         }
-        if (els.plannerScrollRight && els.plannerScroll) {
+        if (els.plannerScrollRight) {
           els.plannerScrollRight.addEventListener("click", () => {
-            const delta = Math.max(240, els.plannerScroll.clientWidth * 0.8);
-            els.plannerScroll.scrollLeft += delta;
+            const scroller = getPlannerScroller();
+            if (!scroller) return;
+            const delta = Math.max(240, scroller.clientWidth * 0.8);
+            scroller.scrollLeft += delta;
             state.planner.hasUserScrolled = true;
-            state.planner.scrollLeft = els.plannerScroll.scrollLeft;
+            state.planner.scrollLeft = scroller.scrollLeft;
           });
         }
-        if (els.plannerScroll) {
-          els.plannerScroll.style.overflowX = "auto";
+        if (els.plannerScroll || els.plannerTimeline) {
+          if (els.plannerScroll) els.plannerScroll.style.overflowX = "auto";
+          if (els.plannerTimeline) els.plannerTimeline.style.overflowX = "auto";
           const wheelHandler = (ev) => {
             if (!els.plannerTimeline) return;
             const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target && ev.target.parentElement;
             if (!target || !target.closest) return;
             if (!target.closest("#plannerTimeline")) return;
+            const scroller = getPlannerScroller();
+            if (!scroller) return;
             const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
             if (!delta) return;
-            const before = els.plannerScroll.scrollLeft;
-            els.plannerScroll.scrollLeft = before + delta;
-            if (els.plannerScroll.scrollLeft === before) return;
-            state.planner.scrollLeft = els.plannerScroll.scrollLeft;
+            const before = scroller.scrollLeft;
+            scroller.scrollLeft = before + delta;
+            if (scroller.scrollLeft === before) return;
+            state.planner.scrollLeft = scroller.scrollLeft;
             state.planner.hasUserScrolled = true;
             ev.preventDefault();
           };
-          els.plannerScroll.addEventListener("wheel", wheelHandler, { passive: false });
           document.addEventListener("wheel", wheelHandler, { passive: false, capture: true });
-          els.plannerScroll.addEventListener("scroll", () => {
-            state.planner.scrollLeft = els.plannerScroll.scrollLeft;
+          const syncScrollState = () => {
+            const scroller = getPlannerScroller();
+            if (!scroller) return;
+            state.planner.scrollLeft = scroller.scrollLeft;
             state.planner.hasUserScrolled = true;
-          });
-          els.plannerScroll.addEventListener("keydown", (ev) => {
+          };
+          if (els.plannerScroll) els.plannerScroll.addEventListener("scroll", syncScrollState);
+          if (els.plannerTimeline) els.plannerTimeline.addEventListener("scroll", syncScrollState);
+          const keyHandler = (ev) => {
+            const scroller = getPlannerScroller();
+            if (!scroller) return;
             if (ev.key === "ArrowRight") {
-              els.plannerScroll.scrollBy({ left: 200, behavior: "smooth" });
+              scroller.scrollBy({ left: 200, behavior: "smooth" });
               ev.preventDefault();
             }
             if (ev.key === "ArrowLeft") {
-              els.plannerScroll.scrollBy({ left: -200, behavior: "smooth" });
+              scroller.scrollBy({ left: -200, behavior: "smooth" });
               ev.preventDefault();
             }
-          });
+          };
+          if (els.plannerScroll) els.plannerScroll.addEventListener("keydown", keyHandler);
+          if (els.plannerTimeline) els.plannerTimeline.addEventListener("keydown", keyHandler);
 
           let dragState = null;
+          const dragHost = els.plannerScroll || els.plannerTimeline;
           const onDragMove = (ev) => {
             if (!dragState) return;
             const dx = ev.clientX - dragState.startX;
-            els.plannerScroll.scrollLeft = dragState.startScroll - dx;
+            const scroller = getPlannerScroller();
+            if (!scroller) return;
+            scroller.scrollLeft = dragState.startScroll - dx;
           };
           const onDragUp = () => {
             if (!dragState) return;
             dragState = null;
-            els.plannerScroll.classList.remove("is-dragging");
+            if (dragHost) dragHost.classList.remove("is-dragging");
             document.removeEventListener("mousemove", onDragMove);
             document.removeEventListener("mouseup", onDragUp);
             window.removeEventListener("blur", onDragUp);
           };
-          els.plannerScroll.addEventListener("mousedown", (ev) => {
+          if (dragHost) dragHost.addEventListener("mousedown", (ev) => {
             if (ev.button !== 0 && ev.button !== 1) return;
             const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
             if (!target || !target.closest) return;
@@ -2965,11 +2996,13 @@
                 return;
               }
             }
+            const scroller = getPlannerScroller();
+            if (!scroller) return;
             dragState = {
               startX: ev.clientX,
-              startScroll: els.plannerScroll.scrollLeft
+              startScroll: scroller.scrollLeft
             };
-            els.plannerScroll.classList.add("is-dragging");
+            dragHost.classList.add("is-dragging");
             document.addEventListener("mousemove", onDragMove);
             document.addEventListener("mouseup", onDragUp);
             window.addEventListener("blur", onDragUp);
@@ -3266,8 +3299,10 @@
         });
       });
 
-      if (els.plannerScroll) {
+      if (els.plannerScroll || els.plannerTimeline) {
         requestAnimationFrame(() => {
+          const scroller = getPlannerScroller();
+          if (!scroller) return;
           let target = state.planner.scrollLeft;
           if (!state.planner.hasUserScrolled || target == null) {
             const today = new Date();
@@ -3278,9 +3313,9 @@
             if (idx == null) idx = 0;
             target = idx * dayWidth;
           }
-          const maxScroll = Math.max(0, els.plannerGrid.scrollWidth - els.plannerScroll.clientWidth);
+          const maxScroll = Math.max(0, els.plannerGrid.scrollWidth - scroller.clientWidth);
           target = clampNumber(Number(target || 0), 0, maxScroll);
-          els.plannerScroll.scrollLeft = target;
+          scroller.scrollLeft = target;
           state.planner.scrollLeft = target;
         });
       }
@@ -3421,7 +3456,8 @@
 
     const getX = (ev) => {
       const rect = track.getBoundingClientRect();
-      const scrollLeft = els.plannerScroll ? els.plannerScroll.scrollLeft : 0;
+      const scroller = getPlannerScroller();
+      const scrollLeft = scroller ? scroller.scrollLeft : 0;
       return ev.clientX - rect.left + scrollLeft;
     };
 
