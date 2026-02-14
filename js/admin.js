@@ -131,6 +131,7 @@
       plannerJumpToday: $("plannerJumpToday"),
       plannerScrollLeft: $("plannerScrollLeft"),
       plannerScrollRight: $("plannerScrollRight"),
+      plannerTimeline: $("plannerTimeline"),
       plannerGrid: $("plannerGrid"),
       plannerScroll: $("plannerScroll"),
       plannerPickModal: $("plannerPickModal"),
@@ -1979,9 +1980,14 @@
       const headRow = document.createElement("div");
       headRow.className = "cx-preview__row";
       const headLeft = document.createElement("div");
-      const title = document.createElement("div");
-      title.className = "cx-preview__title";
-      title.textContent = property.address || "Property";
+        const titleRow = document.createElement("div");
+        titleRow.style.display = "flex";
+        titleRow.style.alignItems = "center";
+        titleRow.style.gap = "8px";
+        const title = document.createElement("div");
+        title.className = "cx-preview__title";
+        title.textContent = property.address || "Property";
+        titleRow.appendChild(title);
       const sub = document.createElement("div");
       sub.className = "cx-preview__sub";
       sub.textContent = [
@@ -1989,8 +1995,8 @@
         owner ? owner.email : "",
         owner ? owner.phone : ""
       ].filter(Boolean).join(" | ");
-      headLeft.appendChild(title);
-      headLeft.appendChild(sub);
+        headLeft.appendChild(titleRow);
+        headLeft.appendChild(sub);
         const editBtn = document.createElement("button");
         editBtn.type = "button";
         editBtn.className = "btn btn-xs";
@@ -1999,8 +2005,8 @@
         deleteBtn.type = "button";
         deleteBtn.className = "btn btn-danger btn-xs";
         deleteBtn.textContent = "Delete";
+        titleRow.appendChild(editBtn);
         headRow.appendChild(headLeft);
-        headRow.appendChild(editBtn);
         headRow.appendChild(deleteBtn);
         head.appendChild(headRow);
         preview.appendChild(head);
@@ -2653,18 +2659,20 @@
             refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
           });
         }
-      if (els.plannerScrollLeft && els.plannerScroll) {
-        els.plannerScrollLeft.addEventListener("click", () => {
-          els.plannerScroll.scrollBy({ left: -Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
-        });
-      }
-      if (els.plannerScrollRight && els.plannerScroll) {
-        els.plannerScrollRight.addEventListener("click", () => {
-          els.plannerScroll.scrollBy({ left: Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
-        });
-      }
+        if (els.plannerScrollLeft && els.plannerScroll) {
+          els.plannerScrollLeft.addEventListener("click", () => {
+            els.plannerScroll.scrollBy({ left: -Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
+            state.planner.hasUserScrolled = true;
+          });
+        }
+        if (els.plannerScrollRight && els.plannerScroll) {
+          els.plannerScrollRight.addEventListener("click", () => {
+            els.plannerScroll.scrollBy({ left: Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
+            state.planner.hasUserScrolled = true;
+          });
+        }
         if (els.plannerScroll) {
-          els.plannerScroll.addEventListener("wheel", (ev) => {
+          const wheelHandler = (ev) => {
             const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
             if (!delta) return;
             els.plannerScroll.scrollLeft += delta;
@@ -2673,7 +2681,10 @@
             if (Math.abs(ev.deltaY) >= Math.abs(ev.deltaX)) {
               ev.preventDefault();
             }
-          }, { passive: false });
+          };
+          [els.plannerScroll, els.plannerTimeline, els.plannerGrid].filter(Boolean).forEach((el) => {
+            el.addEventListener("wheel", wheelHandler, { passive: false });
+          });
           els.plannerScroll.addEventListener("scroll", () => {
             state.planner.scrollLeft = els.plannerScroll.scrollLeft;
             state.planner.hasUserScrolled = true;
@@ -2689,33 +2700,32 @@
             }
           });
 
-        let dragState = null;
-        const onDragMove = (ev) => {
-          if (!dragState) return;
-          const dx = ev.clientX - dragState.startX;
-          els.plannerScroll.scrollLeft = dragState.startScroll - dx;
-        };
-        const onDragUp = () => {
-          if (!dragState) return;
-          dragState = null;
-          els.plannerScroll.classList.remove("is-dragging");
-          document.removeEventListener("mousemove", onDragMove);
-          document.removeEventListener("mouseup", onDragUp);
-        };
+          let dragState = null;
+          const onDragMove = (ev) => {
+            if (!dragState) return;
+            const dx = ev.clientX - dragState.startX;
+            els.plannerScroll.scrollLeft = dragState.startScroll - dx;
+          };
+          const onDragUp = () => {
+            if (!dragState) return;
+            dragState = null;
+            els.plannerScroll.classList.remove("is-dragging");
+            document.removeEventListener("mousemove", onDragMove);
+            document.removeEventListener("mouseup", onDragUp);
+          };
           els.plannerScroll.addEventListener("mousedown", (ev) => {
             if (ev.button !== 0) return;
-          const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
-          if (!target || !target.closest) return;
-          if (!target.closest(".hz-head") && !target.closest(".hz-days") && !target.closest(".hz-hours")) {
-            return;
-          }
-          dragState = {
-            startX: ev.clientX,
-            startScroll: els.plannerScroll.scrollLeft
-          };
-          els.plannerScroll.classList.add("is-dragging");
-          document.addEventListener("mousemove", onDragMove);
-          document.addEventListener("mouseup", onDragUp);
+            const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
+            if (!target || !target.closest) return;
+            if (target.closest(".hz-item")) return;
+            if (target.closest(".hz-row-track")) return;
+            dragState = {
+              startX: ev.clientX,
+              startScroll: els.plannerScroll.scrollLeft
+            };
+            els.plannerScroll.classList.add("is-dragging");
+            document.addEventListener("mousemove", onDragMove);
+            document.addEventListener("mouseup", onDragUp);
             ev.preventDefault();
           });
         }
@@ -2785,37 +2795,41 @@
     renderTimeline(monthTasks, monthTasks, monthActivities, monthStart, monthEnd);
   }
 
-  const PLANNER_BLOCK_HOURS = 4;
-  const PLANNER_SLOT_WIDTH = 48;
-  const PLANNER_HOUR_WIDTH = PLANNER_SLOT_WIDTH / PLANNER_BLOCK_HOURS;
-  const PLANNER_STEP_MINUTES = 30;
+    const PLANNER_BLOCK_HOURS = 4;
+    const PLANNER_SLOT_WIDTH = 48;
+    const PLANNER_HOUR_WIDTH = PLANNER_SLOT_WIDTH / PLANNER_BLOCK_HOURS;
+    const PLANNER_STEP_MINUTES = 30;
+    const PLANNER_RANGE_BUFFER_DAYS = 10;
 
   async function refreshPlannerTimeline() {
     if (!els.plannerGrid) return;
     const today = new Date();
     const selectedMonth = state.planner.month || (els.plannerMonth ? els.plannerMonth.value : "");
     const monthDate = fromMonthInputValue(selectedMonth) || today;
-    const monthStart = startOfMonth(monthDate);
-    const monthEnd = endOfMonth(monthDate);
-    const normalizedMonth = toMonthInputValue(monthStart);
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const normalizedMonth = toMonthInputValue(monthStart);
 
     if (els.plannerMonth && els.plannerMonth.value !== normalizedMonth) {
       els.plannerMonth.value = normalizedMonth;
     }
     state.planner.month = normalizedMonth;
 
-    const monthTasks = await loadTimelineTasks(monthStart, monthEnd);
-    const monthActivities = await loadActivities(monthStart, monthEnd);
-    renderPlannerTimeline(monthStart, monthEnd, monthTasks, monthActivities);
-  }
+      const rangeStart = addDays(monthStart, -PLANNER_RANGE_BUFFER_DAYS);
+      const rangeEnd = addDays(monthEnd, PLANNER_RANGE_BUFFER_DAYS);
+      const monthTasks = await loadTimelineTasks(rangeStart, rangeEnd);
+      const monthActivities = await loadActivities(rangeStart, rangeEnd);
+      const focusDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), Math.min(new Date().getDate(), monthEnd.getDate()));
+      renderPlannerTimeline(rangeStart, rangeEnd, monthTasks, monthActivities, focusDate);
+    }
 
-    function renderPlannerTimeline(startDate, endDate, tasks, activities) {
-      if (!els.plannerGrid) return;
-      const dayCount = endDate.getDate();
-      const dayList = [];
-      for (let i = 0; i < dayCount; i += 1) {
-        dayList.push(addDays(startDate, i));
-      }
+      function renderPlannerTimeline(startDate, endDate, tasks, activities, focusDate) {
+        if (!els.plannerGrid) return;
+        const dayCount = Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
+        const dayList = [];
+        for (let i = 0; i < dayCount; i += 1) {
+          dayList.push(addDays(startDate, i));
+        }
       const dayKeys = dayList.map((d) => toDateInputValue(d));
       const dayIndexByKey = new Map(dayKeys.map((key, idx) => [key, idx]));
 
@@ -3020,10 +3034,10 @@
           if (!state.planner.hasUserScrolled || target == null) {
             const today = new Date();
             const todayKey = toDateInputValue(today);
+            const focusKey = toDateInputValue(focusDate || today);
             let idx = dayIndexByKey.get(todayKey);
-            if (idx == null) {
-              idx = clampNumber(today.getDate() - 1, 0, dayList.length - 1);
-            }
+            if (idx == null) idx = dayIndexByKey.get(focusKey);
+            if (idx == null) idx = 0;
             target = idx * dayWidth;
           }
           const maxScroll = Math.max(0, els.plannerGrid.scrollWidth - els.plannerScroll.clientWidth);
@@ -3082,8 +3096,8 @@
       const list = els.plannerPickList;
       list.innerHTML = "";
       list.appendChild(buildPlannerPickButton({
-        label: "Cleaning booking",
-        meta: "Create a cleaning task",
+        label: "Default cleaning",
+        meta: "One-click cleaning task",
         kind: "booking"
       }));
 

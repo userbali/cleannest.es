@@ -177,28 +177,43 @@
 </div>
 </div>
 <div id="adminTabPlanner" style="display:none;">
-<div class="portal-admin-head">
-<div>
-<h3 style="margin:0;">Planner</h3>
-<p class="section-sub" style="margin:6px 0 0;">Drag across a row to create a booking. Click a booking for details.</p>
-</div>
-<div class="timeline-head-controls">
-<div class="timeline-head-group">
-<input aria-label="Month" class="input" id="plannerMonth" type="month"/>
-</div>
-  <div class="timeline-head-group">
-  <button class="btn" id="plannerJumpToday" type="button">This month</button>
-  <button class="btn" id="plannerScrollLeft" type="button">←</button>
-  <button class="btn" id="plannerScrollRight" type="button">→</button>
+  <div class="portal-admin-head">
+  <div>
+  <h3 style="margin:0;">Planner</h3>
+  <p class="section-sub" style="margin:6px 0 0;">Drag across a row to create a booking. Click a booking for details.</p>
+  <div class="timeline-head-group" style="margin-top:10px;">
+  <input aria-label="Month" class="input" id="plannerMonth" type="month"/>
   </div>
-</div>
-</div>
-<div class="hz-timeline" id="plannerTimeline">
-  <div aria-label="Planner timeline" class="hz-scroll" id="plannerScroll" tabindex="0">
-<div class="hz-grid" id="plannerGrid"></div>
-</div>
-</div>
-</div>
+  </div>
+  <div class="timeline-head-controls">
+    <div class="timeline-head-group">
+    <button class="btn" id="plannerJumpToday" type="button">This month</button>
+    <button class="btn" id="plannerScrollLeft" type="button">←</button>
+    <button class="btn" id="plannerScrollRight" type="button">→</button>
+    </div>
+  </div>
+  </div>
+  <div class="hz-timeline" id="plannerTimeline">
+    <div aria-label="Planner timeline" class="hz-scroll" id="plannerScroll" tabindex="0">
+  <div class="hz-grid" id="plannerGrid"></div>
+  </div>
+  </div>
+  <div class="cn-modal" hidden="" id="plannerPickModal">
+  <div class="cn-modal__overlay" data-action="planner-pick-cancel"></div>
+  <div aria-label="Select activity" aria-modal="true" class="cn-modal__panel" role="dialog">
+  <div class="cn-modal__head">
+  <div>
+  <strong>Select activity</strong>
+  <div class="small-note" id="plannerPickHint">—</div>
+  </div>
+  <button class="btn" data-action="planner-pick-cancel" type="button">Close</button>
+  </div>
+  <div class="form" style="margin-top:10px;">
+  <div class="planner-pick-list" id="plannerPickList"></div>
+  </div>
+  </div>
+  </div>
+  </div>
 <div id="adminTabSchedule" style="display:none;">
 <div class="portal-admin-head">
 <div>

@@ -2035,6 +2035,12 @@ footer{
   max-width: 100%;
   min-width: 0;
   scrollbar-gutter: stable;
+  touch-action: pan-x;
+  cursor: grab;
+  overscroll-behavior-x: contain;
+}
+.hz-scroll.is-dragging{
+  cursor: grabbing;
 }
 .hz-grid{
   display: grid;
