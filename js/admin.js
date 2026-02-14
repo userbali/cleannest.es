@@ -18,7 +18,7 @@
 
   const STATUS_SCHEDULED = ["planned", "assigned", "offered"];
 
-  const state = {
+    const state = {
     clients: [],
     staff: [],
     properties: [],
@@ -43,19 +43,23 @@
       staffTouched: false,
       activities: []
     },
-    planner: {
-      month: ""
-    },
+      planner: {
+        month: "",
+        scrollLeft: null,
+        hasUserScrolled: false
+      },
     schedule: {
       month: "",
       status: "all",
       staffId: "",
       unassignedOnly: false
     },
-    activities: {
-      month: ""
-    }
-  };
+      activities: {
+        month: ""
+      }
+    };
+
+    let plannerPickContext = null;
 
   const taskDetail = {
     modal: null,
@@ -129,6 +133,9 @@
       plannerScrollRight: $("plannerScrollRight"),
       plannerGrid: $("plannerGrid"),
       plannerScroll: $("plannerScroll"),
+      plannerPickModal: $("plannerPickModal"),
+      plannerPickList: $("plannerPickList"),
+      plannerPickHint: $("plannerPickHint"),
     scheduleMonth: $("scheduleMonth"),
     scheduleStatus: $("scheduleStatus"),
     scheduleStaff: $("scheduleStaff"),
@@ -236,6 +243,14 @@
       }
     }
 
+    function detachPlannerPickModal() {
+      if (!els.plannerPickModal) return;
+      const parent = els.plannerPickModal.parentElement;
+      if (parent && parent.id === "adminTabPlanner") {
+        document.body.appendChild(els.plannerPickModal);
+      }
+    }
+
   function pad2(n) {
     return String(n).padStart(2, "0");
   }
@@ -281,6 +296,18 @@
     }
     if (!/^#[0-9a-f]{6}$/i.test(val)) return "";
     return val.toLowerCase();
+  }
+
+  const SETUP_LABEL_PREFIX = "SETUP::";
+  function isSetupLabel(label) {
+    return String(label || "").startsWith(SETUP_LABEL_PREFIX);
+  }
+  function stripSetupLabel(label) {
+    const raw = String(label || "");
+    return isSetupLabel(raw) ? raw.slice(SETUP_LABEL_PREFIX.length) : raw;
+  }
+  function buildSetupLabel(label) {
+    return `${SETUP_LABEL_PREFIX}${label}`;
   }
 
   function applyActivityColor(el, color) {
@@ -688,11 +715,13 @@
     list.forEach((item) => {
       const row = document.createElement("div");
       row.className = "check-item";
+      const setupItem = isSetupLabel(item.label);
+      if (setupItem) row.classList.add("is-setup");
       const input = document.createElement("input");
       input.type = "checkbox";
       input.checked = Boolean(item.done);
       const label = document.createElement("label");
-      label.textContent = item.label || "Checklist item";
+      label.textContent = stripSetupLabel(item.label) || "Checklist item";
       if (item.done) {
         doneCount += 1;
         label.classList.add("done");
@@ -1962,14 +1991,19 @@
       ].filter(Boolean).join(" | ");
       headLeft.appendChild(title);
       headLeft.appendChild(sub);
-      const editBtn = document.createElement("button");
-      editBtn.type = "button";
-      editBtn.className = "btn btn-xs";
-      editBtn.textContent = "Edit";
-      headRow.appendChild(headLeft);
-      headRow.appendChild(editBtn);
-      head.appendChild(headRow);
-      preview.appendChild(head);
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "btn btn-xs";
+        editBtn.textContent = "Edit";
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "btn btn-danger btn-xs";
+        deleteBtn.textContent = "Delete";
+        headRow.appendChild(headLeft);
+        headRow.appendChild(editBtn);
+        headRow.appendChild(deleteBtn);
+        head.appendChild(headRow);
+        preview.appendChild(head);
 
       const editPanel = document.createElement("div");
       editPanel.className = "cx-preview__edit";
@@ -2026,7 +2060,7 @@
       editCancel.addEventListener("click", () => {
         editPanel.hidden = true;
       });
-      editSave.addEventListener("click", async () => {
+        editSave.addEventListener("click", async () => {
         const nextCity = cityInput.value.trim();
         const nextAddress = addrInput.value.trim();
         if (!nextCity) {
@@ -2058,12 +2092,33 @@
           toast(e.message || String(e), "error");
         }
       });
-      [cityInput, addrInput].forEach((input) => {
-        input.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter") editSave.click();
-          if (ev.key === "Escape") editCancel.click();
+        [cityInput, addrInput].forEach((input) => {
+          input.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter") editSave.click();
+            if (ev.key === "Escape") editCancel.click();
+          });
         });
-      });
+
+        deleteBtn.addEventListener("click", async () => {
+          const ok = window.confirm("Delete this property? This cannot be undone.");
+          if (!ok) return;
+          try {
+            const { error } = await CN.sb.from("properties").delete().eq("id", property.id);
+            if (error) throw error;
+            toast("Property deleted.", "ok");
+            state.properties = state.properties.filter((p) => p.id !== property.id);
+            state.selectedPropertyId = null;
+            renderClientsList();
+            renderPropertyDetail(null);
+          } catch (e) {
+            const msg = e.message || String(e);
+            if (/foreign key|constraint/i.test(msg)) {
+              toast("Cannot delete: this property has related tasks or invoices. Remove those first.", "error");
+              return;
+            }
+            toast(msg, "error");
+          }
+        });
 
       const list = document.createElement("div");
       list.className = "cx-preview__list";
@@ -2214,84 +2269,161 @@
       }
     });
 
-    const assetsGrid = document.createElement("div");
-    assetsGrid.className = "row-2";
-    assetsGrid.style.marginTop = "10px";
+      const assetsGrid = document.createElement("div");
+      assetsGrid.className = "row-2";
+      assetsGrid.style.marginTop = "10px";
+      assetsGrid.style.gridTemplateColumns = "repeat(auto-fit, minmax(240px, 1fr))";
 
-    const checklistCol = document.createElement("div");
-    const checklistTitle = document.createElement("div");
-    checklistTitle.innerHTML = `<strong>Checklist template</strong>`;
-    checklistCol.appendChild(checklistTitle);
-    const checklistList = document.createElement("div");
-    checklistList.className = "checklist";
-    if (checklistError) {
-      checklistList.innerHTML = `<div class="small-note">${checklistError.message || String(checklistError)}</div>`;
-    } else if (!checklistItems.length) {
-      checklistList.innerHTML = '<div class="small-note">No checklist items yet.</div>';
-    } else {
-      checklistItems.forEach((item) => {
-        const row = document.createElement("div");
-        row.className = "check-item";
-        const label = document.createElement("label");
-        label.textContent = item.label || "Checklist item";
-        label.style.flex = "1";
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.className = "btn btn-danger";
-        removeBtn.textContent = "Remove";
-        removeBtn.addEventListener("click", async () => {
-          if (!window.confirm("Remove this checklist item?")) return;
-          try {
-            await deletePropertyChecklistItem(item.id);
-            toast("Checklist item removed.", "ok");
-            await renderPropertyDetail(property);
-          } catch (e) {
-            toast(e.message || String(e), "error");
-          }
+      const setupTemplateItems = checklistItems.filter((item) => isSetupLabel(item.label));
+      const checklistTemplateItems = checklistItems.filter((item) => !isSetupLabel(item.label));
+
+      const checklistCol = document.createElement("div");
+      const checklistTitle = document.createElement("div");
+      checklistTitle.innerHTML = `<strong>Checklist template</strong>`;
+      checklistCol.appendChild(checklistTitle);
+      const checklistList = document.createElement("div");
+      checklistList.className = "checklist";
+      if (checklistError) {
+        checklistList.innerHTML = `<div class="small-note">${checklistError.message || String(checklistError)}</div>`;
+      } else if (!checklistTemplateItems.length) {
+        checklistList.innerHTML = '<div class="small-note">No checklist items yet.</div>';
+      } else {
+        checklistTemplateItems.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "check-item";
+          const label = document.createElement("label");
+          label.textContent = stripSetupLabel(item.label) || "Checklist item";
+          label.style.flex = "1";
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "btn btn-danger";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", async () => {
+            if (!window.confirm("Remove this checklist item?")) return;
+            try {
+              await deletePropertyChecklistItem(item.id);
+              toast("Checklist item removed.", "ok");
+              await renderPropertyDetail(property);
+            } catch (e) {
+              toast(e.message || String(e), "error");
+            }
+          });
+          row.appendChild(label);
+          row.appendChild(removeBtn);
+          checklistList.appendChild(row);
         });
-        row.appendChild(label);
-        row.appendChild(removeBtn);
-        checklistList.appendChild(row);
-      });
-    }
-    checklistCol.appendChild(checklistList);
-
-    const checklistAddRow = document.createElement("div");
-    checklistAddRow.className = "row";
-    checklistAddRow.classList.add("checklist-add");
-    checklistAddRow.style.marginTop = "10px";
-    const checklistInput = document.createElement("input");
-    checklistInput.className = "input";
-    checklistInput.placeholder = "Add checklist item";
-    const checklistAddBtn = document.createElement("button");
-    checklistAddBtn.type = "button";
-    checklistAddBtn.className = "btn btn-primary";
-    checklistAddBtn.textContent = "Add";
-    checklistAddBtn.addEventListener("click", async () => {
-      const label = checklistInput.value.trim();
-      if (!label) return;
-      const maxSort = checklistItems.reduce((max, row) => {
-        const val = Number.isFinite(row.sort_order) ? row.sort_order : max;
-        return Math.max(max, val);
-      }, -1);
-      const nextSort = Number.isFinite(maxSort) ? maxSort + 1 : checklistItems.length;
-      try {
-        await addPropertyChecklistItem(property.id, label, nextSort);
-        toast("Checklist item added.", "ok");
-        await renderPropertyDetail(property);
-      } catch (e) {
-        toast(e.message || String(e), "error");
       }
-    });
-    checklistInput.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") checklistAddBtn.click();
-    });
-    checklistAddRow.appendChild(checklistInput);
-    checklistAddRow.appendChild(checklistAddBtn);
-    checklistCol.appendChild(checklistAddRow);
-    assetsGrid.appendChild(checklistCol);
+      checklistCol.appendChild(checklistList);
 
-    const referenceCol = document.createElement("div");
+      const checklistAddRow = document.createElement("div");
+      checklistAddRow.className = "row";
+      checklistAddRow.classList.add("checklist-add");
+      checklistAddRow.style.marginTop = "10px";
+      const checklistInput = document.createElement("input");
+      checklistInput.className = "input";
+      checklistInput.placeholder = "Add checklist item";
+      const checklistAddBtn = document.createElement("button");
+      checklistAddBtn.type = "button";
+      checklistAddBtn.className = "btn btn-primary";
+      checklistAddBtn.textContent = "Add";
+      checklistAddBtn.addEventListener("click", async () => {
+        const label = checklistInput.value.trim();
+        if (!label) return;
+        const maxSort = checklistTemplateItems.reduce((max, row) => {
+          const val = Number.isFinite(row.sort_order) ? row.sort_order : max;
+          return Math.max(max, val);
+        }, -1);
+        const nextSort = Number.isFinite(maxSort) ? maxSort + 1 : checklistTemplateItems.length;
+        try {
+          await addPropertyChecklistItem(property.id, label, nextSort);
+          toast("Checklist item added.", "ok");
+          await renderPropertyDetail(property);
+        } catch (e) {
+          toast(e.message || String(e), "error");
+        }
+      });
+      checklistInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") checklistAddBtn.click();
+      });
+      checklistAddRow.appendChild(checklistInput);
+      checklistAddRow.appendChild(checklistAddBtn);
+      checklistCol.appendChild(checklistAddRow);
+      assetsGrid.appendChild(checklistCol);
+
+      const setupCol = document.createElement("div");
+      const setupTitle = document.createElement("div");
+      setupTitle.innerHTML = `<strong>Setup template</strong>`;
+      setupCol.appendChild(setupTitle);
+      const setupList = document.createElement("div");
+      setupList.className = "checklist";
+      if (checklistError) {
+        setupList.innerHTML = `<div class="small-note">${checklistError.message || String(checklistError)}</div>`;
+      } else if (!setupTemplateItems.length) {
+        setupList.innerHTML = '<div class="small-note">No setup items yet.</div>';
+      } else {
+        setupTemplateItems.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "check-item";
+          const label = document.createElement("label");
+          label.textContent = stripSetupLabel(item.label) || "Setup item";
+          label.style.flex = "1";
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "btn btn-danger";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", async () => {
+            if (!window.confirm("Remove this setup item?")) return;
+            try {
+              await deletePropertyChecklistItem(item.id);
+              toast("Setup item removed.", "ok");
+              await renderPropertyDetail(property);
+            } catch (e) {
+              toast(e.message || String(e), "error");
+            }
+          });
+          row.appendChild(label);
+          row.appendChild(removeBtn);
+          setupList.appendChild(row);
+        });
+      }
+      setupCol.appendChild(setupList);
+
+      const setupAddRow = document.createElement("div");
+      setupAddRow.className = "row";
+      setupAddRow.classList.add("checklist-add");
+      setupAddRow.style.marginTop = "10px";
+      const setupInput = document.createElement("input");
+      setupInput.className = "input";
+      setupInput.placeholder = "Add setup item";
+      const setupAddBtn = document.createElement("button");
+      setupAddBtn.type = "button";
+      setupAddBtn.className = "btn btn-primary";
+      setupAddBtn.textContent = "Add";
+      setupAddBtn.addEventListener("click", async () => {
+        const label = setupInput.value.trim();
+        if (!label) return;
+        const maxSort = setupTemplateItems.reduce((max, row) => {
+          const val = Number.isFinite(row.sort_order) ? row.sort_order : max;
+          return Math.max(max, val);
+        }, -1);
+        const nextSort = Number.isFinite(maxSort) ? maxSort + 1 : setupTemplateItems.length;
+        try {
+          await addPropertyChecklistItem(property.id, buildSetupLabel(label), nextSort);
+          toast("Setup item added.", "ok");
+          await renderPropertyDetail(property);
+        } catch (e) {
+          toast(e.message || String(e), "error");
+        }
+      });
+      setupInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") setupAddBtn.click();
+      });
+      setupAddRow.appendChild(setupInput);
+      setupAddRow.appendChild(setupAddBtn);
+      setupCol.appendChild(setupAddRow);
+      assetsGrid.appendChild(setupCol);
+
+      const referenceCol = document.createElement("div");
     const referenceHead = document.createElement("div");
     referenceHead.className = "row";
     referenceHead.style.justifyContent = "space-between";
@@ -2500,23 +2632,27 @@
   }
 
     function wirePlannerControls() {
-      if (els.plannerMonth) {
-        els.plannerMonth.addEventListener("change", () => {
-          state.planner.month = els.plannerMonth.value || "";
-          refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
-        });
-      }
-      if (els.plannerJumpToday) {
-        els.plannerJumpToday.addEventListener("click", () => {
-          const today = new Date();
-          const monthValue = toMonthInputValue(today);
-          if (els.plannerMonth) {
-            els.plannerMonth.value = monthValue;
-          }
-          state.planner.month = monthValue;
-          refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
-        });
-      }
+        if (els.plannerMonth) {
+          els.plannerMonth.addEventListener("change", () => {
+            state.planner.month = els.plannerMonth.value || "";
+            state.planner.scrollLeft = null;
+            state.planner.hasUserScrolled = false;
+            refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
+          });
+        }
+        if (els.plannerJumpToday) {
+          els.plannerJumpToday.addEventListener("click", () => {
+            const today = new Date();
+            const monthValue = toMonthInputValue(today);
+            if (els.plannerMonth) {
+              els.plannerMonth.value = monthValue;
+            }
+            state.planner.month = monthValue;
+            state.planner.scrollLeft = null;
+            state.planner.hasUserScrolled = false;
+            refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
+          });
+        }
       if (els.plannerScrollLeft && els.plannerScroll) {
         els.plannerScrollLeft.addEventListener("click", () => {
           els.plannerScroll.scrollBy({ left: -Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
@@ -2527,25 +2663,31 @@
           els.plannerScroll.scrollBy({ left: Math.max(240, els.plannerScroll.clientWidth * 0.8), behavior: "smooth" });
         });
       }
-      if (els.plannerScroll) {
-        els.plannerScroll.addEventListener("wheel", (ev) => {
-          const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
-          if (!delta) return;
-          els.plannerScroll.scrollLeft += delta;
-          if (Math.abs(ev.deltaY) >= Math.abs(ev.deltaX)) {
-            ev.preventDefault();
-          }
-        }, { passive: false });
-        els.plannerScroll.addEventListener("keydown", (ev) => {
-          if (ev.key === "ArrowRight") {
-            els.plannerScroll.scrollBy({ left: 200, behavior: "smooth" });
-            ev.preventDefault();
-          }
-          if (ev.key === "ArrowLeft") {
-            els.plannerScroll.scrollBy({ left: -200, behavior: "smooth" });
-            ev.preventDefault();
-          }
-        });
+        if (els.plannerScroll) {
+          els.plannerScroll.addEventListener("wheel", (ev) => {
+            const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+            if (!delta) return;
+            els.plannerScroll.scrollLeft += delta;
+            state.planner.scrollLeft = els.plannerScroll.scrollLeft;
+            state.planner.hasUserScrolled = true;
+            if (Math.abs(ev.deltaY) >= Math.abs(ev.deltaX)) {
+              ev.preventDefault();
+            }
+          }, { passive: false });
+          els.plannerScroll.addEventListener("scroll", () => {
+            state.planner.scrollLeft = els.plannerScroll.scrollLeft;
+            state.planner.hasUserScrolled = true;
+          });
+          els.plannerScroll.addEventListener("keydown", (ev) => {
+            if (ev.key === "ArrowRight") {
+              els.plannerScroll.scrollBy({ left: 200, behavior: "smooth" });
+              ev.preventDefault();
+            }
+            if (ev.key === "ArrowLeft") {
+              els.plannerScroll.scrollBy({ left: -200, behavior: "smooth" });
+              ev.preventDefault();
+            }
+          });
 
         let dragState = null;
         const onDragMove = (ev) => {
@@ -2560,8 +2702,8 @@
           document.removeEventListener("mousemove", onDragMove);
           document.removeEventListener("mouseup", onDragUp);
         };
-        els.plannerScroll.addEventListener("mousedown", (ev) => {
-          if (ev.button !== 0) return;
+          els.plannerScroll.addEventListener("mousedown", (ev) => {
+            if (ev.button !== 0) return;
           const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
           if (!target || !target.closest) return;
           if (!target.closest(".hz-head") && !target.closest(".hz-days") && !target.closest(".hz-hours")) {
@@ -2574,10 +2716,36 @@
           els.plannerScroll.classList.add("is-dragging");
           document.addEventListener("mousemove", onDragMove);
           document.addEventListener("mouseup", onDragUp);
-          ev.preventDefault();
-        });
+            ev.preventDefault();
+          });
+        }
+
+        if (els.plannerPickModal) {
+          els.plannerPickModal.addEventListener("click", (ev) => {
+            if (ev.target && ev.target.dataset && ev.target.dataset.action === "planner-pick-cancel") {
+              closePlannerPickModal();
+            }
+          });
+        }
+        if (els.plannerPickList) {
+          els.plannerPickList.addEventListener("click", (ev) => {
+            const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
+            if (!target || !target.closest) return;
+            const btn = target.closest("button[data-pick-kind]");
+            if (!btn) return;
+            const ctx = plannerPickContext;
+            closePlannerPickModal();
+            if (!ctx) return;
+            const kind = btn.dataset.pickKind || "booking";
+            const typeId = btn.dataset.pickTypeId || "";
+            if (kind === "booking") {
+              prefillTimelineAdd(ctx.day, ctx.propertyId, ctx.startMinutes, ctx.durationMinutes);
+            } else {
+              openActivityModalPrefill(ctx.day, ctx.propertyId, ctx.startMinutes, ctx.durationMinutes, typeId || "custom");
+            }
+          });
+        }
       }
-    }
 
   async function loadTimelineTasks(startDate, endDate) {
     const { data, error } = await CN.sb
@@ -2829,27 +2997,173 @@
     (tasks || []).forEach((task) => renderItem(task, "task"));
     (activities || []).forEach((activity) => renderItem(activity, "activity"));
 
-    rowTracks.forEach((track) => {
-      track.addEventListener("click", (ev) => {
-        const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
-        if (!target) return;
-        const pill = target.closest ? target.closest(".hz-item") : null;
-        if (!pill) return;
-        const kind = pill.dataset.kind;
-        const id = pill.dataset.id;
-        if (kind === "activity") {
-          const activity = activityById.get(id);
-          if (activity) openActivityModal(activity);
-        } else {
-          openTaskDetail(id).catch((e) => toast(e.message || String(e), "error"));
-        }
+      rowTracks.forEach((track) => {
+        track.addEventListener("click", (ev) => {
+          const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
+          if (!target) return;
+          const pill = target.closest ? target.closest(".hz-item") : null;
+          if (!pill) return;
+          const kind = pill.dataset.kind;
+          const id = pill.dataset.id;
+          if (kind === "activity") {
+            const activity = activityById.get(id);
+            if (activity) openActivityModal(activity);
+          } else {
+            openTaskDetail(id).catch((e) => toast(e.message || String(e), "error"));
+          }
+        });
       });
-    });
-  }
 
-  function attachPlannerDrag(track, dayList, dayWidth, hourWidth, propertyId) {
-    if (!track) return;
-    const step = PLANNER_STEP_MINUTES;
+      if (els.plannerScroll) {
+        requestAnimationFrame(() => {
+          let target = state.planner.scrollLeft;
+          if (!state.planner.hasUserScrolled || target == null) {
+            const today = new Date();
+            const todayKey = toDateInputValue(today);
+            let idx = dayIndexByKey.get(todayKey);
+            if (idx == null) {
+              idx = clampNumber(today.getDate() - 1, 0, dayList.length - 1);
+            }
+            target = idx * dayWidth;
+          }
+          const maxScroll = Math.max(0, els.plannerGrid.scrollWidth - els.plannerScroll.clientWidth);
+          target = clampNumber(Number(target || 0), 0, maxScroll);
+          els.plannerScroll.scrollLeft = target;
+          state.planner.scrollLeft = target;
+        });
+      }
+    }
+
+    function formatPlannerPickHint(day, startMinutes, durationMinutes) {
+      const start = toTimeInputValue(startMinutes);
+      const end = toTimeInputValue(startMinutes + durationMinutes);
+      return `${fmtDateLabel(day)} • ${start}–${end}`;
+    }
+
+    function buildPlannerPickButton({ label, meta, kind, typeId, color }) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "planner-pick-item";
+      btn.dataset.pickKind = kind;
+      if (typeId) btn.dataset.pickTypeId = typeId;
+
+      const row = document.createElement("div");
+      row.className = "planner-pick-item__row";
+      if (color) {
+        const swatch = document.createElement("span");
+        swatch.className = "planner-pick-item__swatch";
+        swatch.style.background = color;
+        row.appendChild(swatch);
+      }
+      const title = document.createElement("span");
+      title.className = "planner-pick-item__title";
+      title.textContent = label;
+      row.appendChild(title);
+      btn.appendChild(row);
+
+      if (meta) {
+        const metaEl = document.createElement("div");
+        metaEl.className = "planner-pick-item__meta";
+        metaEl.textContent = meta;
+        btn.appendChild(metaEl);
+      }
+      return btn;
+    }
+
+    function openPlannerPickModal(day, propertyId, startMinutes, durationMinutes) {
+      if (!els.plannerPickModal || !els.plannerPickList) {
+        prefillTimelineAdd(day, propertyId || null, startMinutes, durationMinutes);
+        return;
+      }
+      plannerPickContext = { day, propertyId, startMinutes, durationMinutes };
+      if (els.plannerPickHint) {
+        els.plannerPickHint.textContent = formatPlannerPickHint(day, startMinutes, durationMinutes);
+      }
+      const list = els.plannerPickList;
+      list.innerHTML = "";
+      list.appendChild(buildPlannerPickButton({
+        label: "Cleaning booking",
+        meta: "Create a cleaning task",
+        kind: "booking"
+      }));
+
+      const types = state.activityTypes.filter((type) => !type.is_archived);
+      types.forEach((type) => {
+        const meta = type.default_duration_minutes
+          ? `${type.default_duration_minutes} min default`
+          : "Activity";
+        list.appendChild(buildPlannerPickButton({
+          label: type.name || "Activity",
+          meta,
+          kind: "activity",
+          typeId: type.id,
+          color: type.color || ""
+        }));
+      });
+
+      list.appendChild(buildPlannerPickButton({
+        label: "Custom activity",
+        meta: "Pick details manually",
+        kind: "activity",
+        typeId: "custom"
+      }));
+
+      els.plannerPickModal.removeAttribute("hidden");
+    }
+
+    function closePlannerPickModal() {
+      if (els.plannerPickModal) els.plannerPickModal.setAttribute("hidden", "");
+      plannerPickContext = null;
+    }
+
+    function prefillTimelineAdd(day, propertyId, startMinutes, durationMinutes) {
+      openTimelineAddModal(day, propertyId || null);
+      if (els.timelineAddTime) els.timelineAddTime.value = toTimeInputValue(startMinutes);
+      if (els.timelineAddTbd) els.timelineAddTbd.checked = false;
+      if (els.timelineAddDuration) {
+        const options = Array.from(els.timelineAddDuration.options || []).map((opt) => Number(opt.value));
+        if (options.length) {
+          const nearest = options.reduce((best, val) => {
+            return Math.abs(val - durationMinutes) < Math.abs(best - durationMinutes) ? val : best;
+          }, options[0]);
+          els.timelineAddDuration.value = String(nearest);
+        }
+      }
+    }
+
+    function applyActivityTypeSelection(typeId) {
+      if (!els.activityTypeSelect) return;
+      const value = typeId || "custom";
+      els.activityTypeSelect.value = value;
+      if (els.activityCustomName) {
+        if (value === "custom") {
+          els.activityCustomName.style.display = "block";
+          els.activityCustomName.value = "";
+        } else {
+          els.activityCustomName.style.display = "none";
+          els.activityCustomName.value = "";
+        }
+      }
+      if (value !== "custom") {
+        const type = state.activityTypes.find((t) => t.id === value);
+        if (type && els.activityDuration) {
+          els.activityDuration.value = String(type.default_duration_minutes || 30);
+        }
+      }
+    }
+
+    function openActivityModalPrefill(day, propertyId, startMinutes, durationMinutes, typeId) {
+      openActivityModal();
+      applyActivityTypeSelection(typeId || "custom");
+      if (els.activityDate) els.activityDate.value = toDateInputValue(day);
+      if (els.activityTimeFrom) els.activityTimeFrom.value = toTimeInputValue(startMinutes);
+      if (els.activityDuration) els.activityDuration.value = String(durationMinutes);
+      if (els.activityProperty) els.activityProperty.value = propertyId || "";
+    }
+
+    function attachPlannerDrag(track, dayList, dayWidth, hourWidth, propertyId) {
+      if (!track) return;
+      const step = PLANNER_STEP_MINUTES;
     let dragState = null;
 
     const getX = (ev) => {
@@ -2884,22 +3198,11 @@
       let startMinutes = Math.round(startMinutesRaw / step) * step;
       let endMinutes = Math.round(endMinutesRaw / step) * step;
       if (endMinutes <= startMinutes) endMinutes = startMinutes + 60;
-      startMinutes = clampNumber(startMinutes, 0, 24 * 60 - 1);
-      endMinutes = clampNumber(endMinutes, startMinutes + 30, 24 * 60);
+        startMinutes = clampNumber(startMinutes, 0, 24 * 60 - 1);
+        endMinutes = clampNumber(endMinutes, startMinutes + 30, 24 * 60);
 
-      const duration = endMinutes - startMinutes;
-      openTimelineAddModal(day, propertyId || null);
-      if (els.timelineAddTime) els.timelineAddTime.value = toTimeInputValue(startMinutes);
-      if (els.timelineAddTbd) els.timelineAddTbd.checked = false;
-      if (els.timelineAddDuration) {
-        const options = Array.from(els.timelineAddDuration.options || []).map((opt) => Number(opt.value));
-        if (options.length) {
-          const nearest = options.reduce((best, val) => {
-            return Math.abs(val - duration) < Math.abs(best - duration) ? val : best;
-          }, options[0]);
-          els.timelineAddDuration.value = String(nearest);
-        }
-      }
+        const duration = endMinutes - startMinutes;
+        openPlannerPickModal(day, propertyId || null, startMinutes, duration);
 
       dragState.selection.remove();
       dragState = null;
@@ -5335,6 +5638,7 @@
 
       detachActivityModals();
       detachTimelineModal();
+      detachPlannerPickModal();
 
     wireTabs();
     wireAdminTools();
