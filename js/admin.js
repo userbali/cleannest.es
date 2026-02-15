@@ -1665,6 +1665,20 @@
     return cleaning ? cleaning.id : (state.taskLabels[0] ? state.taskLabels[0].id : null);
   }
 
+  async function ensureDefaultTaskLabelId() {
+    let labelId = findDefaultLabelId();
+    if (labelId) return labelId;
+    try {
+      await seedMissingTaskLabels();
+    } catch (e) {
+      try {
+        await loadTaskLabels();
+      } catch (_) {}
+    }
+    labelId = findDefaultLabelId();
+    return labelId || null;
+  }
+
   async function requireAdminProfile() {
     profile = await CN.getProfile();
     if (!profile || profile.role !== "admin") {
@@ -1780,13 +1794,14 @@
 
   async function seedMissingTaskLabels() {
     if (state.taskLabels.length) return;
+    const payload = { tenant_id: tenantId, name: "Cleaning" };
     const { error } = await CN.sb
       .from("task_labels")
-      .upsert(
-        { tenant_id: tenantId, name: "Cleaning", color: "#59a14f" },
-        { onConflict: "tenant_id,name" }
-      );
-    if (error) throw error;
+      .upsert(payload, { onConflict: "tenant_id,name" });
+    if (error) {
+      const { error: insertError } = await CN.sb.from("task_labels").insert(payload);
+      if (insertError && insertError.code !== "23505") throw insertError;
+    }
     await loadTaskLabels();
   }
 
@@ -4059,7 +4074,6 @@
         toast("Select a property.", "error");
         return;
       }
-    const labelId = findDefaultLabelId();
     const duration = els.timelineAddDuration ? Number(els.timelineAddDuration.value || 0) : null;
     const notes = els.timelineAddNotes ? els.timelineAddNotes.value.trim() : "";
     const tbd = els.timelineAddTbd ? els.timelineAddTbd.checked : false;
@@ -4100,6 +4114,7 @@
       ]);
       return;
     }
+    const labelId = await ensureDefaultTaskLabelId();
     if (!labelId) {
       toast("No task labels available. Add a label first.", "error");
       return;
@@ -4133,7 +4148,12 @@
     const { data, error } = await CN.sb.from("tasks").insert(payload).select("id, property_id").single();
     if (error) throw error;
     if (data) {
-      await ensureTaskChecklist(data.id, data.property_id);
+      try {
+        await ensureTaskChecklist(data.id, data.property_id);
+      } catch (checklistError) {
+        console.error("Checklist template apply failed:", checklistError);
+        toast("Booking created, but checklist template could not be applied.", "error");
+      }
     }
     syncMonthFiltersToDate(day);
     toast("Booking created.", "ok");
