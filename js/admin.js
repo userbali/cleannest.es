@@ -399,6 +399,19 @@
     return window.matchMedia("(max-width: 900px)").matches;
   }
 
+  function syncMonthFiltersToDate(dateLike, { includeActivities = false } = {}) {
+    const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+    if (Number.isNaN(date.getTime())) return;
+    const monthValue = toMonthInputValue(date);
+    state.timeline.month = monthValue;
+    state.schedule.month = monthValue;
+    if (els.timelineMonth) els.timelineMonth.value = monthValue;
+    if (els.scheduleMonth) els.scheduleMonth.value = monthValue;
+    if (includeActivities && els.activitiesMonth) {
+      els.activitiesMonth.value = monthValue;
+    }
+  }
+
   function getSelectedPaletteColor(name) {
     const selected = document.querySelector(`input[name="${name}"]:checked`);
     return selected ? selected.value : "";
@@ -4077,9 +4090,14 @@
       }
       const { error: activityError } = await CN.sb.from("activities").insert(payload);
       if (activityError) throw activityError;
+      syncMonthFiltersToDate(day, { includeActivities: true });
       toast("Activity created.", "ok");
       closeTimelineAddModal();
-      await refreshTimeline().catch(() => {});
+      await Promise.all([
+        refreshTimeline().catch(() => {}),
+        refreshPlannerTimeline().catch(() => {}),
+        refreshActivities().catch(() => {})
+      ]);
       return;
     }
     if (!labelId) {
@@ -4117,9 +4135,11 @@
     if (data) {
       await ensureTaskChecklist(data.id, data.property_id);
     }
+    syncMonthFiltersToDate(day);
     toast("Booking created.", "ok");
     closeTimelineAddModal();
     await refreshTaskViews();
+    await refreshPlannerTimeline().catch(() => {});
   }
 
   function exportTimelineCsv() {
@@ -5602,10 +5622,12 @@
       }
       const { error } = await CN.sb.from("activities").update(patch).eq("id", editing.id);
       if (error) throw error;
+      syncMonthFiltersToDate(day, { includeActivities: true });
       toast("Activity updated.", "ok");
       closeActivityModal();
       await refreshActivities();
       await refreshTimeline();
+      await refreshPlannerTimeline();
       return;
     }
 
@@ -5630,9 +5652,12 @@
     }
     const { error } = await CN.sb.from("activities").insert(payload);
     if (error) throw error;
+    syncMonthFiltersToDate(day, { includeActivities: true });
     toast("Activity created.", "ok");
     closeActivityModal();
     await refreshActivities();
+    await refreshTimeline();
+    await refreshPlannerTimeline();
   }
 
   async function updateActivity(id, patch) {
