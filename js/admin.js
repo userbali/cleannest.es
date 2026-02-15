@@ -4254,7 +4254,7 @@
   async function loadWorklogTasks(startDate, endDate) {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, start_at, end_at, completed_at, status, add_ons, label_id, property_id, property:properties(address)")
+      .select("id, day_date, start_at, end_at, completed_at, status, price, add_ons, label_id, property_id, property:properties(address, price)")
       .eq("tenant_id", tenantId)
       .eq("status", "done")
       .gte("day_date", toDateInputValue(startDate))
@@ -4285,23 +4285,20 @@
       const propAddr = (task.property && task.property.address) || (getPropertyById(task.property_id) || {}).address || "Property";
       const label = getLabelById(task.label_id);
       const activityName = label && label.name ? label.name : "Cleaning";
+      const taskPrice = parseAmount(task.price);
+      const propPrice = parseAmount(task && task.property ? task.property.price : null);
+      const basePrice = Number.isFinite(taskPrice) ? taskPrice : (Number.isFinite(propPrice) ? propPrice : null);
+      const addOns = normalizeAddOns(task.add_ons);
+      const extraParts = addOns.map((addon) => `${addon.label}: ${formatCurrency(addon.amount)}`);
       const timestamp = task.completed_at || task.end_at || task.start_at || (task.day_date ? `${task.day_date}T00:00:00` : "");
       const sortKey = timestamp || task.day_date || "";
       rows.push({
         address: propAddr,
         activity: activityName,
-        extraPrice: null,
+        price: Number.isFinite(basePrice) ? basePrice : null,
+        extraPrice: extraParts.length ? extraParts.join(" | ") : "-",
         timestamp,
         sortKey
-      });
-      normalizeAddOns(task.add_ons).forEach((addon) => {
-        rows.push({
-          address: propAddr,
-          activity: `Extra - ${addon.label}`,
-          extraPrice: addon.amount,
-          timestamp,
-          sortKey
-        });
       });
     });
     (Array.isArray(activities) ? activities : []).forEach((activity) => {
@@ -4313,7 +4310,8 @@
       rows.push({
         address: propAddr,
         activity: activityName,
-        extraPrice: Number.isFinite(activityPrice) ? activityPrice : null,
+        price: Number.isFinite(activityPrice) ? activityPrice : null,
+        extraPrice: "-",
         timestamp,
         sortKey
       });
@@ -4353,6 +4351,7 @@
       <tr>
         <th>Address</th>
         <th>Activity</th>
+        <th>Price</th>
         <th>Extra price</th>
         <th>Timestamp</th>
       </tr>
@@ -4365,12 +4364,16 @@
       addressCell.textContent = item.address || "Property";
       const activityCell = document.createElement("td");
       activityCell.textContent = item.activity || "Cleaning";
+      const priceCell = document.createElement("td");
+      priceCell.textContent = Number.isFinite(Number(item.price)) ? formatCurrency(item.price) : "-";
       const extraCell = document.createElement("td");
-      extraCell.textContent = Number.isFinite(Number(item.extraPrice)) ? formatCurrency(item.extraPrice) : "-";
+      extraCell.textContent = item.extraPrice || "-";
+      extraCell.title = extraCell.textContent;
       const timestampCell = document.createElement("td");
       timestampCell.textContent = formatWorklogTimestamp(item.timestamp);
       row.appendChild(addressCell);
       row.appendChild(activityCell);
+      row.appendChild(priceCell);
       row.appendChild(extraCell);
       row.appendChild(timestampCell);
       tbody.appendChild(row);
@@ -4401,10 +4404,11 @@
     const data = rows.map((item) => [
       item.address || "",
       item.activity || "",
-      Number.isFinite(Number(item.extraPrice)) ? formatAmount(item.extraPrice) : "",
+      Number.isFinite(Number(item.price)) ? formatAmount(item.price) : "",
+      item.extraPrice && item.extraPrice !== "-" ? item.extraPrice : "",
       formatWorklogTimestamp(item.timestamp)
     ]);
-    downloadCsv("worklog.csv", ["Address", "Activity", "Extra price", "Timestamp"], data);
+    downloadCsv("worklog.csv", ["Address", "Activity", "Price", "Extra price", "Timestamp"], data);
   }
 
   function formatCurrency(value) {
