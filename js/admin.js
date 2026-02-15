@@ -3488,17 +3488,16 @@
       if (!track) return;
       const step = PLANNER_STEP_MINUTES;
     let dragState = null;
+    const maxTrackWidth = () => Math.max(1, Number(track.scrollWidth || 0));
 
     const getX = (ev) => {
       const rect = track.getBoundingClientRect();
-      const scroller = getPlannerScroller();
-      const scrollLeft = scroller ? scroller.scrollLeft : 0;
-      return ev.clientX - rect.left + scrollLeft;
+      return ev.clientX - rect.left;
     };
 
     const onMove = (ev) => {
       if (!dragState) return;
-      const x = clampNumber(getX(ev), 0, dragState.maxWidth);
+      const x = clampNumber(getX(ev), 0, dragState.maxWidth - 1);
       const start = Math.min(dragState.startX, x);
       const end = Math.max(dragState.startX, x);
       dragState.selection.style.left = `${start}px`;
@@ -3507,12 +3506,19 @@
 
     const onUp = (ev) => {
       if (!dragState) return;
-      const x = clampNumber(getX(ev), 0, dragState.maxWidth);
+      const x = clampNumber(getX(ev), 0, dragState.maxWidth - 1);
       const start = Math.min(dragState.startX, x);
       let end = Math.max(dragState.startX, x);
-        const startDayIndex = Math.floor(start / dayWidth);
-        const endDayIndex = Math.floor((end - 1) / dayWidth);
+        const startDayIndex = clampNumber(Math.floor(start / dayWidth), 0, Math.max(0, dayList.length - 1));
         const day = dayList[startDayIndex];
+        if (!(day instanceof Date) || Number.isNaN(day.getTime())) {
+          dragState.selection.remove();
+          dragState = null;
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          toast("Invalid date selection. Please try again.", "error");
+          return;
+        }
         const dayStart = startDayIndex * dayWidth;
         const startMinutesRaw = ((start - dayStart) / hourWidth) * 60;
         const endMinutesRaw = ((end - dayStart) / hourWidth) * 60;
@@ -3537,7 +3543,8 @@
       const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target.parentElement;
       if (target && target.closest && target.closest(".hz-item")) return;
       ev.preventDefault();
-      const startX = clampNumber(getX(ev), 0, track.scrollWidth);
+      const width = maxTrackWidth();
+      const startX = clampNumber(getX(ev), 0, width - 1);
       const selection = document.createElement("div");
       selection.className = "hz-selection";
       selection.style.left = `${startX}px`;
@@ -3546,7 +3553,7 @@
       dragState = {
         startX,
         selection,
-        maxWidth: track.scrollWidth
+        maxWidth: width
       };
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
