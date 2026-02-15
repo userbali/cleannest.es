@@ -11,6 +11,7 @@
     { key: "timeline", label: "Timeline" },
     { key: "planner", label: "Planner" },
     { key: "schedule", label: "Schedule" },
+    { key: "worklog", label: "Work log" },
     { key: "activities", label: "Activities" },
     { key: "invoices", label: "Invoices" },
     { key: "modules", label: "Modules" }
@@ -54,6 +55,10 @@
       staffId: "",
       unassignedOnly: false
     },
+      worklog: {
+        month: "",
+        rows: []
+      },
       activities: {
         month: ""
       }
@@ -109,6 +114,7 @@
     adminTabTimeline: $("adminTabTimeline"),
     adminTabPlanner: $("adminTabPlanner"),
     adminTabSchedule: $("adminTabSchedule"),
+    adminTabWorklog: $("adminTabWorklog"),
     adminTabActivities: $("adminTabActivities"),
     adminTabInvoices: $("adminTabInvoices"),
     adminTabModules: $("adminTabModules"),
@@ -156,6 +162,9 @@
     scheduleExportCsv: $("scheduleExportCsv"),
     schedulePrint: $("schedulePrint"),
     scheduleList: $("scheduleList"),
+    worklogMonth: $("worklogMonth"),
+    worklogExportCsv: $("worklogExportCsv"),
+    worklogList: $("worklogList"),
     activitiesMonth: $("activitiesMonth"),
     activityNewBtn: $("activityNewBtn"),
     activityTypeNewBtn: $("activityTypeNewBtn"),
@@ -174,6 +183,7 @@
     activityDuration: $("activityDuration"),
     activityStaff: $("activityStaff"),
     activityProperty: $("activityProperty"),
+    activityPrice: $("activityPrice"),
     activityNotes: $("activityNotes"),
     activityTypeColorPalette: $("activityTypeColorPalette"),
     activitySave: $("activitySave"),
@@ -4229,6 +4239,174 @@
     }
   }
 
+  function wireWorklogControls() {
+    if (els.worklogMonth && !els.worklogMonth.value) {
+      els.worklogMonth.value = toMonthInputValue(new Date());
+    }
+    if (els.worklogMonth) {
+      els.worklogMonth.addEventListener("change", () => refreshWorklog().catch((e) => toast(e.message || String(e), "error")));
+    }
+    if (els.worklogExportCsv) {
+      els.worklogExportCsv.addEventListener("click", exportWorklogCsv);
+    }
+  }
+
+  async function loadWorklogTasks(startDate, endDate) {
+    const { data, error } = await CN.sb
+      .from("tasks")
+      .select("id, day_date, start_at, end_at, completed_at, status, add_ons, label_id, property_id, property:properties(address)")
+      .eq("tenant_id", tenantId)
+      .eq("status", "done")
+      .gte("day_date", toDateInputValue(startDate))
+      .lte("day_date", toDateInputValue(endDate))
+      .order("day_date", { ascending: false })
+      .order("completed_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function loadWorklogActivities(startDate, endDate) {
+    const { data, error } = await CN.sb
+      .from("activities")
+      .select("id, day_date, start_at, completed_at, status, price, type_name_snapshot, property_id, property:properties(address)")
+      .eq("tenant_id", tenantId)
+      .eq("status", "done")
+      .gte("day_date", toDateInputValue(startDate))
+      .lte("day_date", toDateInputValue(endDate))
+      .order("day_date", { ascending: false })
+      .order("completed_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  function buildWorklogRows(tasks, activities) {
+    const rows = [];
+    (Array.isArray(tasks) ? tasks : []).forEach((task) => {
+      const propAddr = (task.property && task.property.address) || (getPropertyById(task.property_id) || {}).address || "Property";
+      const label = getLabelById(task.label_id);
+      const activityName = label && label.name ? label.name : "Cleaning";
+      const timestamp = task.completed_at || task.end_at || task.start_at || (task.day_date ? `${task.day_date}T00:00:00` : "");
+      const sortKey = timestamp || task.day_date || "";
+      rows.push({
+        address: propAddr,
+        activity: activityName,
+        extraPrice: null,
+        timestamp,
+        sortKey
+      });
+      normalizeAddOns(task.add_ons).forEach((addon) => {
+        rows.push({
+          address: propAddr,
+          activity: `Extra - ${addon.label}`,
+          extraPrice: addon.amount,
+          timestamp,
+          sortKey
+        });
+      });
+    });
+    (Array.isArray(activities) ? activities : []).forEach((activity) => {
+      const propAddr = (activity.property && activity.property.address) || (getPropertyById(activity.property_id) || {}).address || "No property";
+      const activityName = activity.type_name_snapshot || "Activity";
+      const activityPrice = parseAmount(activity.price);
+      const timestamp = activity.completed_at || activity.start_at || (activity.day_date ? `${activity.day_date}T00:00:00` : "");
+      const sortKey = timestamp || activity.day_date || "";
+      rows.push({
+        address: propAddr,
+        activity: activityName,
+        extraPrice: Number.isFinite(activityPrice) ? activityPrice : null,
+        timestamp,
+        sortKey
+      });
+    });
+    rows.sort((a, b) => {
+      const addressCompare = String(a.address || "").localeCompare(String(b.address || ""));
+      if (addressCompare !== 0) return addressCompare;
+      const tsCompare = String(b.sortKey || "").localeCompare(String(a.sortKey || ""));
+      if (tsCompare !== 0) return tsCompare;
+      return String(a.activity || "").localeCompare(String(b.activity || ""));
+    });
+    return rows;
+  }
+
+  function formatWorklogTimestamp(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      const raw = String(value);
+      return raw.includes("T") ? raw.replace("T", " ").slice(0, 16) : raw;
+    }
+    return fmtDateTime(date.toISOString());
+  }
+
+  function renderWorklog(rows) {
+    if (!els.worklogList) return;
+    if (!rows.length) {
+      els.worklogList.innerHTML = '<div class="empty-state"><div class="empty-state__msg">No completed cleanings or activities for this month.</div></div>';
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    const table = document.createElement("table");
+    table.className = "data-table";
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr>
+        <th>Address</th>
+        <th>Activity</th>
+        <th>Extra price</th>
+        <th>Timestamp</th>
+      </tr>
+    `;
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    rows.forEach((item) => {
+      const row = document.createElement("tr");
+      const addressCell = document.createElement("td");
+      addressCell.textContent = item.address || "Property";
+      const activityCell = document.createElement("td");
+      activityCell.textContent = item.activity || "Cleaning";
+      const extraCell = document.createElement("td");
+      extraCell.textContent = Number.isFinite(Number(item.extraPrice)) ? formatCurrency(item.extraPrice) : "-";
+      const timestampCell = document.createElement("td");
+      timestampCell.textContent = formatWorklogTimestamp(item.timestamp);
+      row.appendChild(addressCell);
+      row.appendChild(activityCell);
+      row.appendChild(extraCell);
+      row.appendChild(timestampCell);
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    els.worklogList.innerHTML = "";
+    els.worklogList.appendChild(wrap);
+  }
+
+  async function refreshWorklog() {
+    if (!els.worklogList || !els.worklogMonth) return;
+    const monthDate = fromMonthInputValue(els.worklogMonth.value) || new Date();
+    const startDate = startOfMonth(monthDate);
+    const endDate = endOfMonth(monthDate);
+    const [tasks, activities] = await Promise.all([
+      loadWorklogTasks(startDate, endDate),
+      loadWorklogActivities(startDate, endDate)
+    ]);
+    const rows = buildWorklogRows(tasks, activities);
+    state.worklog.month = toMonthInputValue(startDate);
+    state.worklog.rows = rows;
+    renderWorklog(rows);
+  }
+
+  function exportWorklogCsv() {
+    const rows = state.worklog.rows || [];
+    const data = rows.map((item) => [
+      item.address || "",
+      item.activity || "",
+      Number.isFinite(Number(item.extraPrice)) ? formatAmount(item.extraPrice) : "",
+      formatWorklogTimestamp(item.timestamp)
+    ]);
+    downloadCsv("worklog.csv", ["Address", "Activity", "Extra price", "Timestamp"], data);
+  }
+
   function formatCurrency(value) {
     return `EUR ${formatAmount(value)}`;
   }
@@ -5024,6 +5202,9 @@
     renderClientsList();
     await refreshTimeline();
     await refreshSchedule();
+    if (state.activeTab === "worklog") {
+      await refreshWorklog();
+    }
   }
 
   async function updateTask(id, patch) {
@@ -5567,6 +5748,10 @@
       if (els.activityProperty) {
         els.activityProperty.value = activity.property_id || "";
       }
+      if (els.activityPrice) {
+        const priceVal = parseAmount(activity.price);
+        els.activityPrice.value = Number.isFinite(priceVal) ? formatAmount(priceVal) : "";
+      }
       if (els.activityNotes) {
         els.activityNotes.value = activity.notes || "";
       }
@@ -5578,6 +5763,7 @@
       if (els.activityDate) els.activityDate.value = toDateInputValue(new Date());
       if (els.activityTimeFrom) els.activityTimeFrom.value = "09:00";
       if (els.activityDuration) els.activityDuration.value = "30";
+      if (els.activityPrice) els.activityPrice.value = "";
       if (els.activityNotes) els.activityNotes.value = "";
       if (els.activityModalTitle) els.activityModalTitle.textContent = "New activity";
       if (els.activityModalHint) els.activityModalHint.textContent = "Schedule something custom";
@@ -5618,6 +5804,12 @@
       const duration = els.activityDuration ? Number(els.activityDuration.value || 30) : 30;
       const staffId = els.activityStaff ? els.activityStaff.value : "";
       const propId = els.activityProperty ? els.activityProperty.value : "";
+      const rawPrice = els.activityPrice ? els.activityPrice.value.trim() : "";
+      const parsedPrice = rawPrice === "" ? null : parseAmount(rawPrice);
+      if (rawPrice !== "" && !Number.isFinite(parsedPrice)) {
+        toast("Enter a valid price.", "error");
+        return;
+      }
       const notes = els.activityNotes ? els.activityNotes.value.trim() : "";
       if (!propId) {
         toast("Property is required.", "error");
@@ -5634,6 +5826,7 @@
         duration_minutes: duration,
         assigned_user_id: staffId || null,
         property_id: propId || null,
+        price: Number.isFinite(parsedPrice) ? parsedPrice : null,
         notes: notes || null
       };
       if (color) {
@@ -5667,6 +5860,7 @@
       status: "planned",
       assigned_user_id: staffId || null,
       property_id: propId || null,
+      price: Number.isFinite(parsedPrice) ? parsedPrice : null,
       notes: notes || null,
       created_by_user_id: userId
     };
@@ -5704,6 +5898,7 @@
       timeline: els.adminTabTimeline,
       planner: els.adminTabPlanner,
       schedule: els.adminTabSchedule,
+      worklog: els.adminTabWorklog,
       activities: els.adminTabActivities,
       invoices: els.adminTabInvoices,
       modules: els.adminTabModules
@@ -5723,6 +5918,9 @@
     }
     if (tabKey === "planner") {
       refreshPlannerTimeline().catch((e) => toast(e.message || String(e), "error"));
+    }
+    if (tabKey === "worklog") {
+      refreshWorklog().catch((e) => toast(e.message || String(e), "error"));
     }
     if (tabKey === "invoices") {
       refreshInvoices().catch((e) => toast(e.message || String(e), "error"));
@@ -5750,6 +5948,7 @@
         timeline: els.adminTabTimeline,
         planner: els.adminTabPlanner,
         schedule: els.adminTabSchedule,
+        worklog: els.adminTabWorklog,
         activities: els.adminTabActivities,
         invoices: els.adminTabInvoices,
         modules: els.adminTabModules
@@ -6014,6 +6213,7 @@
     wireTimelineControls();
     wirePlannerControls();
     wireScheduleControls();
+    wireWorklogControls();
     wireActivitiesControls();
     wireInvoiceControls();
     wireBillingContactControls();
@@ -6070,6 +6270,7 @@
     await refreshTimeline().catch(() => {});
     await refreshPlannerTimeline().catch(() => {});
     await refreshSchedule().catch(() => {});
+    await refreshWorklog().catch(() => {});
     await refreshActivities().catch(() => {});
     if (mobileStartTimeline) {
       scrollTimelineToDate(toDateInputValue(new Date()));

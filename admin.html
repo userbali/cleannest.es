@@ -60,6 +60,7 @@
 <button class="tab-btn" data-action="admin-tab" data-tab="timeline" type="button">🗓️ Timeline</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="planner" type="button">🧭 Planner</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="schedule" type="button">📅 Schedule</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="worklog" type="button">Work log</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="activities" type="button">📝 Activities</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="invoices" type="button">🧾 Invoices</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="modules" type="button">🧩 Modules</button>
@@ -242,6 +243,21 @@
 </div>
 </div>
 <div id="scheduleList"></div>
+</div>
+<div id="adminTabWorklog" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Work log</h3>
+<p class="section-sub" style="margin:6px 0 0;">Completed cleanings, extras, and activities by property.</p>
+</div>
+<div class="timeline-head-controls">
+<div class="timeline-head-group">
+<input aria-label="Month" class="input" id="worklogMonth" type="month"/>
+<button class="btn" id="worklogExportCsv" type="button">CSV</button>
+</div>
+</div>
+</div>
+<div id="worklogList"></div>
 </div>
 <div id="adminTabInvoices" style="display:none;">
 <div class="portal-admin-head">
@@ -460,9 +476,15 @@
 <select class="input" id="activityStaff"></select>
 </div>
 </div>
-<div style="margin-top:12px;">
+<div class="row-2" style="margin-top:12px;">
+<div>
 <div class="label">Property (optional)</div>
 <select class="input" id="activityProperty"></select>
+</div>
+<div>
+<div class="label">Price EUR (optional)</div>
+<input class="input" id="activityPrice" min="0" placeholder="0.00" step="0.01" type="number"/>
+</div>
 </div>
 <div style="margin-top:12px;">
 <div class="label">Notes (optional)</div>
@@ -657,6 +679,7 @@
 
 
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js?v=20260214-scrollfix"></script></body>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js?v=20260215-worklog"></script></body>
 </html>
+
 
