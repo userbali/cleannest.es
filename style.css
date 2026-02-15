@@ -2013,6 +2013,13 @@ footer{
 .timeline-booking__status .badge{ margin-top: 0; }
 .timeline-booking__time{ font-weight: 900; font-size: 13px; }
 .timeline-booking__addr{ font-weight: 800; color: var(--text); overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-booking__addr.is-link{ cursor: pointer; text-decoration: underline dotted transparent; }
+.timeline-booking__addr.is-link:hover{ text-decoration-color: currentColor; }
+.timeline-booking__addr.is-link:focus-visible{
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 .timeline-booking__meta{ color: var(--muted); font-size: 12px; }
 
 .timeline-booking__actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }

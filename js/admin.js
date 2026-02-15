@@ -395,6 +395,10 @@
     return els.plannerScroll || els.plannerTimeline || null;
   }
 
+  function isMobileViewport() {
+    return window.matchMedia("(max-width: 900px)").matches;
+  }
+
   function getSelectedPaletteColor(name) {
     const selected = document.querySelector(`input[name="${name}"]:checked`);
     return selected ? selected.value : "";
@@ -955,6 +959,14 @@
               </div>
               <div class="card">
                 <div class="row" style="justify-content:space-between; align-items:center;">
+                  <h3 style="margin:0;">Take / upload photo</h3>
+                  <button class="btn btn-ref" id="taskWorkUpload" type="button">Take / upload photo</button>
+                </div>
+                <div class="small-note" style="margin-top:6px;">Take a photo now or upload from gallery. Required before completing.</div>
+                <div id="taskWorkGallery"></div>
+              </div>
+              <div class="card">
+                <div class="row" style="justify-content:space-between; align-items:center;">
                   <h3 style="margin:0;">Checklist</h3>
                   <span class="small-note" id="taskChecklistHint"></span>
                 </div>
@@ -996,14 +1008,6 @@
                 <button class="btn btn-ref" id="taskRefUpload" type="button">Upload reference</button>
               </div>
               <div id="taskRefGallery"></div>
-            </div>
-            <div class="card">
-              <div class="row" style="justify-content:space-between; align-items:center;">
-                <h3 style="margin:0;">Work photos</h3>
-                <button class="btn btn-ref" id="taskWorkUpload" type="button">Upload work photo</button>
-              </div>
-              <div class="small-note" style="margin-top:6px;">At least one work photo is required to complete.</div>
-              <div id="taskWorkGallery"></div>
             </div>
             <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px;">
               <button class="btn" id="taskDoneBtn" type="button">Done</button>
@@ -1066,6 +1070,7 @@
     taskDetail.workInput = document.createElement("input");
     taskDetail.workInput.type = "file";
     taskDetail.workInput.accept = "image/*";
+    taskDetail.workInput.setAttribute("capture", "environment");
     taskDetail.workInput.multiple = true;
     taskDetail.workInput.className = "file-hidden";
     modal.appendChild(taskDetail.workInput);
@@ -1480,6 +1485,8 @@
     });
 
     updateTaskDetailActions(task);
+    const panel = detail.modal ? detail.modal.querySelector(".cn-modal__panel") : null;
+    if (panel) panel.scrollTop = 0;
     detail.modal.removeAttribute("hidden");
   }
 
@@ -3620,6 +3627,25 @@
             const addr = document.createElement("div");
             addr.className = "timeline-booking__addr";
             addr.textContent = (task.property && task.property.address) || (getPropertyById(task.property_id) || {}).address || "Property";
+            const openTaskFromTimeline = () => {
+              openTaskDetail(task).catch((e) => toast(e.message || String(e), "error"));
+            };
+            addr.classList.add("is-link");
+            addr.tabIndex = 0;
+            addr.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              openTaskFromTimeline();
+            });
+            addr.addEventListener("keydown", (ev) => {
+              if (ev.key === "Enter" || ev.key === " ") {
+                ev.preventDefault();
+                openTaskFromTimeline();
+              }
+            });
+            if (isMobileViewport()) {
+              main.style.cursor = "pointer";
+              main.addEventListener("click", openTaskFromTimeline);
+            }
             const meta = document.createElement("div");
             meta.className = "timeline-booking__meta";
             const label = getLabelById(task.label_id);
@@ -3651,7 +3677,7 @@
             detailBtn.type = "button";
             detailBtn.textContent = "Details";
             detailBtn.addEventListener("click", () => {
-              openTaskDetail(task).catch((e) => toast(e.message || String(e), "error"));
+              openTaskFromTimeline();
             });
             actions.appendChild(detailBtn);
             if (task.invoice_id) {
@@ -5977,13 +6003,25 @@
     await refreshInvoices();
 
     const firstEnabled = MODULE_DEFS.find((m) => state.modules[m.key] !== false);
-    setActiveTab(firstEnabled ? firstEnabled.key : "properties");
+    const mobileStartTimeline = isMobileViewport() && state.modules.timeline !== false;
+    if (mobileStartTimeline) {
+      const today = new Date();
+      const monthValue = toMonthInputValue(today);
+      state.timeline.month = monthValue;
+      if (els.timelineMonth) els.timelineMonth.value = monthValue;
+      setActiveTab("timeline");
+    } else {
+      setActiveTab(firstEnabled ? firstEnabled.key : "properties");
+    }
     applyModuleVisibility();
 
     await refreshTimeline().catch(() => {});
     await refreshPlannerTimeline().catch(() => {});
     await refreshSchedule().catch(() => {});
     await refreshActivities().catch(() => {});
+    if (mobileStartTimeline) {
+      scrollTimelineToDate(toDateInputValue(new Date()));
+    }
 
     if (baseDataError && els.activitiesPanel) {
       const msg = baseDataError.message || String(baseDataError);
