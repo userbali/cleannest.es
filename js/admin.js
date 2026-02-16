@@ -1072,7 +1072,6 @@
             <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px;">
               <button class="btn" id="taskDoneBtn" type="button">Done</button>
               <button class="btn" id="taskEmailBtn" type="button">Send email</button>
-              <button class="btn" id="taskInvoiceBtn" type="button">Create invoice</button>
               <button class="btn" id="taskRescheduleBtn" type="button">Reschedule</button>
               <button class="btn" id="taskCancelBtn" type="button">Cancel</button>
               <button class="btn" id="taskReopenBtn" type="button">Reopen</button>
