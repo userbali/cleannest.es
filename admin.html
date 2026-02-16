@@ -361,7 +361,7 @@
 <div class="portal-admin-head">
 <div>
 <h3 style="margin:0;">Invoices</h3>
-<p class="section-sub" style="margin:6px 0 0;">Create manual invoices and store them for printing or email. Numbers auto-increment per month.</p>
+<p class="section-sub" style="margin:6px 0 0;">Create manual invoices and store them for printing or email. Invoice numbers are fully manual.</p>
 </div>
 <div style="display:flex; gap:8px; flex-wrap:wrap;">
 <button class="btn" id="invoiceSettingsBtn" type="button">Invoice settings</button>
@@ -373,7 +373,7 @@
 <div class="card-b">
 <div class="row-2">
 <input class="input" id="invoiceIssueDate" type="date"/>
-<input class="input" disabled="" id="invoiceNumber" placeholder="Auto number"/>
+<input class="input" id="invoiceNumber" placeholder="Invoice number (manual)"/>
 </div>
 <div class="label" style="margin-top:10px;">Billing contact</div>
 <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap;">
@@ -777,7 +777,7 @@
 
 
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js?v=20260216-no-invoice-btn"></script></body>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js?v=20260216-manual-invoice-number"></script></body>
 </html>
 
 

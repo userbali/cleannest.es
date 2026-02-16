@@ -5368,7 +5368,7 @@
 
   function clearInvoiceForm() {
     if (els.invoiceIssueDate) els.invoiceIssueDate.value = toDateInputValue(new Date());
-    if (els.invoiceNumber) els.invoiceNumber.value = "Auto";
+    if (els.invoiceNumber) els.invoiceNumber.value = "";
     if (els.invoiceProperty) els.invoiceProperty.value = "";
     if (els.invoiceBillingContact) {
       els.invoiceBillingContact.value = "";
@@ -5487,16 +5487,6 @@
           .catch((e) => toast(e.message || String(e), "error"));
       });
     }
-  }
-
-  async function getNextInvoiceNumber(issueDate) {
-    const { data, error } = await CN.sb.rpc("next_invoice_number", {
-      p_tenant_id: tenantId,
-      p_issue_date: issueDate,
-      p_owner_user_id: userId
-    });
-    if (error) throw error;
-    return data;
   }
 
   async function loadInvoices() {
@@ -5872,6 +5862,7 @@
 
   async function createInvoice() {
     const issueDate = els.invoiceIssueDate ? (els.invoiceIssueDate.value || toDateInputValue(new Date())) : toDateInputValue(new Date());
+    const invoiceNumber = els.invoiceNumber ? els.invoiceNumber.value.trim() : "";
     const propertyId = els.invoiceProperty ? (els.invoiceProperty.value || null) : null;
     const customerName = els.invoiceCustomerName ? els.invoiceCustomerName.value.trim() : "";
     const customerEmail = els.invoiceCustomerEmail ? els.invoiceCustomerEmail.value.trim() : "";
@@ -5890,6 +5881,10 @@
       toast("Customer name is required.", "error");
       return;
     }
+    if (!invoiceNumber) {
+      toast("Invoice number is required.", "error");
+      return;
+    }
     if (!items.length) {
       toast("Add at least one item.", "error");
       return;
@@ -5904,7 +5899,6 @@
 
     const invoiceTotal = items.reduce((sum, item) => sum + (Number(item.line_total) || 0), 0);
     const customerAddressPayload = packInvoiceCustomerAddress(customerAddress, customerTaxId, customerCountry);
-    const invoiceNumber = await getNextInvoiceNumber(issueDate);
     const { data: invoice, error } = await CN.sb.from("invoices").insert({
       tenant_id: tenantId,
       owner_user_id: userId,
@@ -5918,7 +5912,13 @@
       customer_email: customerEmail || null,
       customer_address: customerAddressPayload
     }).select("id").single();
-    if (error) throw error;
+    if (error) {
+      const isDuplicateNumber = String(error.code || "") === "23505" && String(error.message || "").toLowerCase().includes("invoice_number");
+      if (isDuplicateNumber) {
+        throw new Error("This invoice number already exists. Use a different one.");
+      }
+      throw error;
+    }
 
     const itemsPayload = items.map((item) => ({
       tenant_id: tenantId,

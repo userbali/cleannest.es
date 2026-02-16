@@ -150,6 +150,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const taskId = body && body.task_id ? String(body.task_id) : "";
     const mode = body && body.mode ? String(body.mode) : "all";
+    const manualInvoiceNumber = body && body.invoice_number ? String(body.invoice_number).trim() : "";
     const emailOnly = mode === "email";
     const invoiceOnly = mode === "invoice";
     if (!taskId) {
@@ -204,13 +205,8 @@ serve(async (req) => {
 
       const completedAt = task.completed_at || new Date().toISOString();
       const issueDate = (completedAt || task.day_date || new Date().toISOString()).slice(0, 10);
-      const { data: invoiceNumber, error: invoiceNumberError } = await supabase.rpc("next_invoice_number", {
-        p_tenant_id: task.tenant_id,
-        p_issue_date: issueDate,
-        p_owner_user_id: profile.id
-      });
-      if (invoiceNumberError || !invoiceNumber) {
-        return jsonResponse({ error: "Failed to generate invoice number." }, 500);
+      if (!manualInvoiceNumber) {
+        return jsonResponse({ error: "invoice_number is required for manual invoice numbering." }, 400);
       }
 
       const { items, total } = buildInvoiceItems(task, property);
@@ -233,7 +229,7 @@ serve(async (req) => {
           issue_date: issueDate,
           total,
           currency: "EUR",
-          invoice_number: invoiceNumber,
+          invoice_number: manualInvoiceNumber,
           customer_name: billing.name || "Customer",
           customer_email: billing.email,
           customer_address: customerAddressPayload
@@ -241,6 +237,11 @@ serve(async (req) => {
         .select("id")
         .single();
       if (invoiceError || !invoice) {
+        const duplicateNumber = String(invoiceError?.code || "") === "23505"
+          && String(invoiceError?.message || "").toLowerCase().includes("invoice_number");
+        if (duplicateNumber) {
+          return jsonResponse({ error: "Invoice number already exists." }, 409);
+        }
         return jsonResponse({ error: invoiceError?.message || "Failed to create invoice." }, 500);
       }
       const itemsPayload = items.map((item) => ({
