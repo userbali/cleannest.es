@@ -63,6 +63,7 @@
 <button class="tab-btn" data-action="admin-tab" data-tab="schedule" type="button">📅 Schedule</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="worklog" type="button">Work log</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="expenses" type="button">Expenses</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="finance" type="button">Financial report</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="activities" type="button">📝 Activities</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="invoices" type="button">🧾 Invoices</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="modules" type="button">🧩 Modules</button>
@@ -311,6 +312,50 @@
 </div>
 </div>
 <div id="expensesList"></div>
+</div>
+<div id="adminTabFinance" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Financial report</h3>
+<p class="section-sub" style="margin:6px 0 0;">Monthly revenue vs expenses with property and daily breakdown.</p>
+</div>
+<div class="timeline-head-controls">
+<div class="timeline-head-group">
+<input aria-label="Month" class="input" id="financeMonth" type="month"/>
+<select aria-label="Property" class="input" id="financeProperty">
+<option value="">All properties</option>
+</select>
+<button class="btn" id="financeResetFilters" type="button">Reset</button>
+<button class="btn" id="financeExportCsv" type="button">CSV</button>
+</div>
+</div>
+</div>
+<div class="finance-kpis" id="financeKpis">
+<div class="card finance-kpi">
+<div class="small-note">Revenue</div>
+<div class="finance-kpi__value" id="financeRevenueValue">EUR 0.00</div>
+</div>
+<div class="card finance-kpi">
+<div class="small-note">Expenses</div>
+<div class="finance-kpi__value" id="financeExpensesValue">EUR 0.00</div>
+</div>
+<div class="card finance-kpi">
+<div class="small-note">Profit</div>
+<div class="finance-kpi__value" id="financeProfitValue">EUR 0.00</div>
+</div>
+<div class="card finance-kpi">
+<div class="small-note">Margin</div>
+<div class="finance-kpi__value" id="financeMarginValue">0%</div>
+</div>
+</div>
+<div class="card">
+<div class="card-h">By property</div>
+<div id="financePropertyTable"></div>
+</div>
+<div class="card" style="margin-top:12px;">
+<div class="card-h">By day</div>
+<div id="financeDayTable"></div>
+</div>
 </div>
 <div id="adminTabInvoices" style="display:none;">
 <div class="portal-admin-head">
@@ -732,7 +777,7 @@
 
 
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js?v=20260216-expenses"></script></body>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js?v=20260216-finance-v1"></script></body>
 </html>
 
 

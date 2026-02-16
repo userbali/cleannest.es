@@ -13,6 +13,7 @@
     { key: "schedule", label: "Schedule" },
     { key: "worklog", label: "Work log" },
     { key: "expenses", label: "Expenses" },
+    { key: "finance", label: "Financial report" },
     { key: "activities", label: "Activities" },
     { key: "invoices", label: "Invoices" },
     { key: "modules", label: "Modules" }
@@ -63,6 +64,13 @@
       expenses: {
         month: "",
         rows: []
+      },
+      finance: {
+        month: "",
+        propertyId: "",
+        kpi: { revenue: 0, expenses: 0, profit: 0, margin: 0 },
+        propertyRows: [],
+        dayRows: []
       },
       activities: {
         month: ""
@@ -121,6 +129,7 @@
     adminTabSchedule: $("adminTabSchedule"),
     adminTabWorklog: $("adminTabWorklog"),
     adminTabExpenses: $("adminTabExpenses"),
+    adminTabFinance: $("adminTabFinance"),
     adminTabActivities: $("adminTabActivities"),
     adminTabInvoices: $("adminTabInvoices"),
     adminTabModules: $("adminTabModules"),
@@ -183,6 +192,16 @@
     expenseSaveBtn: $("expenseSaveBtn"),
     expenseCancelBtn: $("expenseCancelBtn"),
     expensesList: $("expensesList"),
+    financeMonth: $("financeMonth"),
+    financeProperty: $("financeProperty"),
+    financeResetFilters: $("financeResetFilters"),
+    financeExportCsv: $("financeExportCsv"),
+    financeRevenueValue: $("financeRevenueValue"),
+    financeExpensesValue: $("financeExpensesValue"),
+    financeProfitValue: $("financeProfitValue"),
+    financeMarginValue: $("financeMarginValue"),
+    financePropertyTable: $("financePropertyTable"),
+    financeDayTable: $("financeDayTable"),
     activitiesMonth: $("activitiesMonth"),
     activityNewBtn: $("activityNewBtn"),
     activityTypeNewBtn: $("activityTypeNewBtn"),
@@ -1801,6 +1820,23 @@
     els.expenseProperty.value = current;
   }
 
+  function populateFinancePropertySelect(selectedId) {
+    if (!els.financeProperty) return;
+    const current = selectedId != null ? String(selectedId) : (els.financeProperty.value || "");
+    els.financeProperty.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "All properties";
+    els.financeProperty.appendChild(placeholder);
+    state.properties.forEach((prop) => {
+      const opt = document.createElement("option");
+      opt.value = prop.id;
+      opt.textContent = [prop.city, prop.address].filter(Boolean).join(" | ") || prop.address || "Property";
+      els.financeProperty.appendChild(opt);
+    });
+    els.financeProperty.value = current;
+  }
+
   function populateInvoiceBillingContactSelect(selectedId) {
     if (!els.invoiceBillingContact) return;
     const current = selectedId || els.invoiceBillingContact.value || "";
@@ -1924,6 +1960,7 @@
     populateInvoicePropertySelect();
     populateInvoiceBillingContactSelect();
     populateExpensePropertySelect();
+    populateFinancePropertySelect();
   }
 
   function buildPropertyStats() {
@@ -4703,6 +4740,395 @@
     }
   }
 
+  function getFinancePropertyLabel(propertyId, propertyRef) {
+    const rel = propertyRef || {};
+    const city = rel.city || "";
+    const address = rel.address || "";
+    if (city || address) {
+      return [city, address].filter(Boolean).join(" | ");
+    }
+    const prop = propertyId ? getPropertyById(propertyId) : null;
+    if (prop) {
+      return [prop.city, prop.address].filter(Boolean).join(" | ") || prop.address || "Property";
+    }
+    return "No property";
+  }
+
+  function getFinanceTaskRevenue(task) {
+    const taskPrice = parseAmount(task && task.price);
+    const propPrice = parseAmount(task && task.property ? task.property.price : null);
+    const base = Number.isFinite(taskPrice) ? taskPrice : (Number.isFinite(propPrice) ? propPrice : 0);
+    const addOns = normalizeAddOns(task && task.add_ons);
+    const extras = sumAddOns(addOns);
+    return base + extras;
+  }
+
+  function getFinanceActivityRevenue(activity) {
+    const price = parseAmount(activity && activity.price);
+    return Number.isFinite(price) ? price : 0;
+  }
+
+  function getFinanceExpenseAmount(expense) {
+    const amount = parseAmount(expense && expense.amount);
+    return Number.isFinite(amount) ? amount : 0;
+  }
+
+  async function loadFinanceTasks(startDate, endDate, propertyId) {
+    let query = CN.sb
+      .from("tasks")
+      .select("id, day_date, price, add_ons, property_id, property:properties(city, address, price)")
+      .eq("tenant_id", tenantId)
+      .eq("status", "done")
+      .gte("day_date", toDateInputValue(startDate))
+      .lte("day_date", toDateInputValue(endDate))
+      .order("day_date", { ascending: true });
+    if (propertyId) query = query.eq("property_id", propertyId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function loadFinanceActivities(startDate, endDate, propertyId) {
+    let query = CN.sb
+      .from("activities")
+      .select("id, day_date, price, property_id, property:properties(city, address)")
+      .eq("tenant_id", tenantId)
+      .eq("status", "done")
+      .gte("day_date", toDateInputValue(startDate))
+      .lte("day_date", toDateInputValue(endDate))
+      .order("day_date", { ascending: true });
+    if (propertyId) query = query.eq("property_id", propertyId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function loadFinanceExpenses(startDate, endDate, propertyId) {
+    let query = CN.sb
+      .from("expenses")
+      .select("id, expense_date, amount, property_id, property:properties(city, address)")
+      .eq("tenant_id", tenantId)
+      .gte("expense_date", toDateInputValue(startDate))
+      .lte("expense_date", toDateInputValue(endDate))
+      .order("expense_date", { ascending: true });
+    if (propertyId) query = query.eq("property_id", propertyId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  function buildFinanceReport(tasks, activities, expenses) {
+    const kpi = { revenue: 0, expenses: 0, profit: 0, margin: 0 };
+    const propertyMap = new Map();
+    const dayMap = new Map();
+
+    const ensurePropertyRow = (key, label) => {
+      if (!propertyMap.has(key)) {
+        propertyMap.set(key, {
+          key,
+          label: label || "No property",
+          revenue: 0,
+          expenses: 0,
+          profit: 0,
+          taskCount: 0,
+          activityCount: 0,
+          expenseCount: 0
+        });
+      }
+      return propertyMap.get(key);
+    };
+
+    const ensureDayRow = (day) => {
+      if (!dayMap.has(day)) {
+        dayMap.set(day, {
+          day,
+          revenue: 0,
+          expenses: 0,
+          profit: 0,
+          taskCount: 0,
+          activityCount: 0,
+          expenseCount: 0
+        });
+      }
+      return dayMap.get(day);
+    };
+
+    (Array.isArray(tasks) ? tasks : []).forEach((task) => {
+      const amount = getFinanceTaskRevenue(task);
+      const propKey = task && task.property_id ? String(task.property_id) : "__none__";
+      const propLabel = getFinancePropertyLabel(task ? task.property_id : "", task ? task.property : null);
+      const dayKey = task && task.day_date ? String(task.day_date) : "";
+      kpi.revenue += amount;
+      const pRow = ensurePropertyRow(propKey, propLabel);
+      pRow.revenue += amount;
+      pRow.taskCount += 1;
+      if (dayKey) {
+        const dRow = ensureDayRow(dayKey);
+        dRow.revenue += amount;
+        dRow.taskCount += 1;
+      }
+    });
+
+    (Array.isArray(activities) ? activities : []).forEach((activity) => {
+      const amount = getFinanceActivityRevenue(activity);
+      const propKey = activity && activity.property_id ? String(activity.property_id) : "__none__";
+      const propLabel = getFinancePropertyLabel(activity ? activity.property_id : "", activity ? activity.property : null);
+      const dayKey = activity && activity.day_date ? String(activity.day_date) : "";
+      kpi.revenue += amount;
+      const pRow = ensurePropertyRow(propKey, propLabel);
+      pRow.revenue += amount;
+      pRow.activityCount += 1;
+      if (dayKey) {
+        const dRow = ensureDayRow(dayKey);
+        dRow.revenue += amount;
+        dRow.activityCount += 1;
+      }
+    });
+
+    (Array.isArray(expenses) ? expenses : []).forEach((expense) => {
+      const amount = getFinanceExpenseAmount(expense);
+      const propKey = expense && expense.property_id ? String(expense.property_id) : "__none__";
+      const propLabel = getFinancePropertyLabel(expense ? expense.property_id : "", expense ? expense.property : null);
+      const dayKey = expense && expense.expense_date ? String(expense.expense_date) : "";
+      kpi.expenses += amount;
+      const pRow = ensurePropertyRow(propKey, propLabel);
+      pRow.expenses += amount;
+      pRow.expenseCount += 1;
+      if (dayKey) {
+        const dRow = ensureDayRow(dayKey);
+        dRow.expenses += amount;
+        dRow.expenseCount += 1;
+      }
+    });
+
+    const propertyRows = Array.from(propertyMap.values()).map((row) => {
+      const profit = row.revenue - row.expenses;
+      return { ...row, profit };
+    }).sort((a, b) => String(a.label || "").localeCompare(String(b.label || "")));
+
+    const dayRows = Array.from(dayMap.values()).map((row) => {
+      const profit = row.revenue - row.expenses;
+      return { ...row, profit };
+    }).sort((a, b) => String(b.day || "").localeCompare(String(a.day || "")));
+
+    kpi.profit = kpi.revenue - kpi.expenses;
+    kpi.margin = kpi.revenue > 0 ? (kpi.profit / kpi.revenue) * 100 : 0;
+
+    return { kpi, propertyRows, dayRows };
+  }
+
+  function renderFinanceKpis(kpi) {
+    if (els.financeRevenueValue) els.financeRevenueValue.textContent = formatCurrency(kpi.revenue || 0);
+    if (els.financeExpensesValue) els.financeExpensesValue.textContent = formatCurrency(kpi.expenses || 0);
+    if (els.financeProfitValue) els.financeProfitValue.textContent = formatCurrency(kpi.profit || 0);
+    if (els.financeMarginValue) {
+      const margin = Number(kpi && kpi.margin);
+      els.financeMarginValue.textContent = `${Number.isFinite(margin) ? margin.toFixed(1) : "0.0"}%`;
+    }
+  }
+
+  function renderFinancePropertyTable(rows) {
+    if (!els.financePropertyTable) return;
+    if (!rows.length) {
+      els.financePropertyTable.innerHTML = '<div class="empty-state"><div class="empty-state__msg">No data for this month.</div></div>';
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    const table = document.createElement("table");
+    table.className = "data-table";
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr>
+        <th>Property</th>
+        <th>Revenue</th>
+        <th>Expenses</th>
+        <th>Profit</th>
+        <th>Tasks</th>
+        <th>Activities</th>
+        <th>Expense items</th>
+      </tr>
+    `;
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    rows.forEach((item) => {
+      const row = document.createElement("tr");
+      const cells = [
+        item.label || "No property",
+        formatCurrency(item.revenue || 0),
+        formatCurrency(item.expenses || 0),
+        formatCurrency(item.profit || 0),
+        String(Number(item.taskCount || 0)),
+        String(Number(item.activityCount || 0)),
+        String(Number(item.expenseCount || 0))
+      ];
+      cells.forEach((value) => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.appendChild(cell);
+      });
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    els.financePropertyTable.innerHTML = "";
+    els.financePropertyTable.appendChild(wrap);
+  }
+
+  function renderFinanceDayTable(rows) {
+    if (!els.financeDayTable) return;
+    if (!rows.length) {
+      els.financeDayTable.innerHTML = '<div class="empty-state"><div class="empty-state__msg">No data for this month.</div></div>';
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    const table = document.createElement("table");
+    table.className = "data-table";
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr>
+        <th>Date</th>
+        <th>Revenue</th>
+        <th>Expenses</th>
+        <th>Profit</th>
+        <th>Tasks</th>
+        <th>Activities</th>
+        <th>Expense items</th>
+      </tr>
+    `;
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    rows.forEach((item) => {
+      const row = document.createElement("tr");
+      const cells = [
+        item.day || "-",
+        formatCurrency(item.revenue || 0),
+        formatCurrency(item.expenses || 0),
+        formatCurrency(item.profit || 0),
+        String(Number(item.taskCount || 0)),
+        String(Number(item.activityCount || 0)),
+        String(Number(item.expenseCount || 0))
+      ];
+      cells.forEach((value) => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.appendChild(cell);
+      });
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    els.financeDayTable.innerHTML = "";
+    els.financeDayTable.appendChild(wrap);
+  }
+
+  async function refreshFinanceReport() {
+    if (!els.financeMonth) return;
+    const monthDate = fromMonthInputValue(els.financeMonth.value) || new Date();
+    const startDate = startOfMonth(monthDate);
+    const endDate = endOfMonth(monthDate);
+    const propertyId = els.financeProperty ? String(els.financeProperty.value || "").trim() : "";
+    state.finance.month = toMonthInputValue(startDate);
+    state.finance.propertyId = propertyId;
+
+    let missingExpensesTable = false;
+    const [tasks, activities, expenses] = await Promise.all([
+      loadFinanceTasks(startDate, endDate, propertyId),
+      loadFinanceActivities(startDate, endDate, propertyId),
+      loadFinanceExpenses(startDate, endDate, propertyId).catch((e) => {
+        if (isMissingExpensesTableError(e)) {
+          missingExpensesTable = true;
+          return [];
+        }
+        throw e;
+      })
+    ]);
+
+    const report = buildFinanceReport(tasks, activities, expenses);
+    state.finance.kpi = report.kpi;
+    state.finance.propertyRows = report.propertyRows;
+    state.finance.dayRows = report.dayRows;
+    renderFinanceKpis(report.kpi);
+    renderFinancePropertyTable(report.propertyRows);
+    renderFinanceDayTable(report.dayRows);
+
+    if (missingExpensesTable) {
+      toast("Expenses table is missing. Run db_expenses_module.sql first.", "error");
+    }
+  }
+
+  function exportFinanceCsv() {
+    const kpi = state.finance.kpi || { revenue: 0, expenses: 0, profit: 0, margin: 0 };
+    const propertyRows = state.finance.propertyRows || [];
+    const dayRows = state.finance.dayRows || [];
+    const rows = [];
+
+    rows.push(["summary", "month_total", formatAmount(kpi.revenue), formatAmount(kpi.expenses), formatAmount(kpi.profit), `${Number(kpi.margin || 0).toFixed(1)}%`, "", "", ""]);
+    propertyRows.forEach((item) => {
+      rows.push([
+        "property",
+        item.label || "No property",
+        formatAmount(item.revenue || 0),
+        formatAmount(item.expenses || 0),
+        formatAmount(item.profit || 0),
+        "",
+        String(Number(item.taskCount || 0)),
+        String(Number(item.activityCount || 0)),
+        String(Number(item.expenseCount || 0))
+      ]);
+    });
+    dayRows.forEach((item) => {
+      rows.push([
+        "day",
+        item.day || "",
+        formatAmount(item.revenue || 0),
+        formatAmount(item.expenses || 0),
+        formatAmount(item.profit || 0),
+        "",
+        String(Number(item.taskCount || 0)),
+        String(Number(item.activityCount || 0)),
+        String(Number(item.expenseCount || 0))
+      ]);
+    });
+
+    downloadCsv(
+      "financial-report.csv",
+      ["Section", "Key", "Revenue", "Expenses", "Profit", "Margin", "Tasks", "Activities", "Expense items"],
+      rows
+    );
+  }
+
+  function wireFinanceControls() {
+    const now = new Date();
+    if (els.financeMonth && !els.financeMonth.value) {
+      els.financeMonth.value = toMonthInputValue(now);
+    }
+    if (els.financeProperty) {
+      populateFinancePropertySelect(state.finance.propertyId || "");
+    }
+    if (els.financeMonth) {
+      els.financeMonth.addEventListener("change", () => {
+        refreshFinanceReport().catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (els.financeProperty) {
+      els.financeProperty.addEventListener("change", () => {
+        refreshFinanceReport().catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (els.financeResetFilters) {
+      els.financeResetFilters.addEventListener("click", () => {
+        if (els.financeMonth) els.financeMonth.value = toMonthInputValue(new Date());
+        if (els.financeProperty) els.financeProperty.value = "";
+        refreshFinanceReport().catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (els.financeExportCsv) {
+      els.financeExportCsv.addEventListener("click", exportFinanceCsv);
+    }
+  }
+
   function formatCurrency(value) {
     return `EUR ${formatAmount(value)}`;
   }
@@ -5521,6 +5947,9 @@
     if (state.activeTab === "worklog") {
       await refreshWorklog();
     }
+    if (state.activeTab === "finance") {
+      await refreshFinanceReport();
+    }
   }
 
   async function updateTask(id, patch) {
@@ -6216,6 +6645,7 @@
       schedule: els.adminTabSchedule,
       worklog: els.adminTabWorklog,
       expenses: els.adminTabExpenses,
+      finance: els.adminTabFinance,
       activities: els.adminTabActivities,
       invoices: els.adminTabInvoices,
       modules: els.adminTabModules
@@ -6241,6 +6671,9 @@
     }
     if (tabKey === "expenses") {
       refreshExpenses().catch((e) => toast(e.message || String(e), "error"));
+    }
+    if (tabKey === "finance") {
+      refreshFinanceReport().catch((e) => toast(e.message || String(e), "error"));
     }
     if (tabKey === "invoices") {
       refreshInvoices().catch((e) => toast(e.message || String(e), "error"));
@@ -6270,6 +6703,7 @@
         schedule: els.adminTabSchedule,
         worklog: els.adminTabWorklog,
         expenses: els.adminTabExpenses,
+        finance: els.adminTabFinance,
         activities: els.adminTabActivities,
         invoices: els.adminTabInvoices,
         modules: els.adminTabModules
@@ -6536,6 +6970,7 @@
     wireScheduleControls();
     wireWorklogControls();
     wireExpensesControls();
+    wireFinanceControls();
     wireActivitiesControls();
     wireInvoiceControls();
     wireBillingContactControls();
@@ -6594,6 +7029,7 @@
     await refreshSchedule().catch(() => {});
     await refreshWorklog().catch(() => {});
     await refreshExpenses().catch(() => {});
+    await refreshFinanceReport().catch(() => {});
     await refreshActivities().catch(() => {});
     if (mobileStartTimeline) {
       scrollTimelineToDate(toDateInputValue(new Date()));
