@@ -1999,7 +1999,7 @@ footer{
   margin: 12mm;
 }
 
-.timeline-booking.is-focus{
+.timeline-booking.is-focus:not(.is-done){
   background: rgba(46, 144, 250, .14);
   box-shadow: inset 4px 0 0 rgba(46, 144, 250, .55);
 }
@@ -2009,6 +2009,7 @@ footer{
   opacity: 1;
   background: rgba(51, 194, 107, .12);
   border-color: rgba(26, 168, 90, .35);
+  box-shadow: none;
 }
 .timeline-booking.is-cancelled{ opacity: .55; text-decoration: line-through; }
 
