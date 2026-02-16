@@ -1690,7 +1690,7 @@ footer{
   display:grid;
   grid-template-columns: minmax(0, 1.4fr) 100px 140px 160px 80px;
   gap:8px;
-  align-items:center;
+  align-items:start;
 }
 
 .invoice-item-total{
@@ -1701,6 +1701,13 @@ footer{
   padding: 8px 10px;
   font-size: 12px;
   box-shadow: none;
+  align-self: start;
+}
+
+.invoice-item-notes{
+  grid-column: 1 / 5;
+  min-height: 64px;
+  resize: vertical;
 }
 
 @media (max-width: 720px){
@@ -1717,6 +1724,10 @@ footer{
   }
 
   .invoice-item-row .invoice-item-total{
+    grid-column: 1 / -1;
+  }
+
+  .invoice-item-row .invoice-item-notes{
     grid-column: 1 / -1;
   }
 
@@ -1937,6 +1948,13 @@ footer{
 
 .invoice-doc__row:last-child{
   border-bottom: none;
+}
+
+.invoice-doc__line-note{
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-wrap;
 }
 
 .invoice-doc__total{
@@ -3451,6 +3469,7 @@ footer{
   .invoice-item-head{ display: none; }
   .invoice-item-row{ grid-template-columns: 1fr 1fr; }
   .invoice-item-service{ grid-column: 1 / -1; }
+  .invoice-item-notes{ grid-column: 1 / -1; }
   .invoice-item-total{ grid-column: 1 / -1; }
   .invoice-item-remove{ grid-column: 1 / -1; justify-self: flex-start; }
 }

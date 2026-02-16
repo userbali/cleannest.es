@@ -4552,6 +4552,12 @@
     total.disabled = true;
     total.placeholder = "Total / Base imponible";
 
+    const notes = document.createElement("textarea");
+    notes.className = "input invoice-item-notes";
+    notes.placeholder = "Description / Details (optional)";
+    notes.rows = 2;
+    notes.value = item.notes || "";
+
     const removeBtn = document.createElement("button");
     removeBtn.className = "btn invoice-item-remove";
     removeBtn.type = "button";
@@ -4563,6 +4569,7 @@
         qty.value = "1";
         unit.value = "";
         total.value = "";
+        notes.value = "";
       } else {
         row.remove();
       }
@@ -4577,6 +4584,7 @@
     row.appendChild(unit);
     row.appendChild(total);
     row.appendChild(removeBtn);
+    row.appendChild(notes);
     els.invoiceItems.appendChild(row);
     updateInvoiceTotal();
   }
@@ -4595,7 +4603,8 @@
       const service = (row.querySelector(".invoice-item-service") || {}).value || "";
       const qtyRaw = (row.querySelector(".invoice-item-qty") || {}).value || "";
       const unitRaw = (row.querySelector(".invoice-item-unit") || {}).value || "";
-      const hasAny = service.trim() || qtyRaw.trim() || unitRaw.trim();
+      const notesRaw = (row.querySelector(".invoice-item-notes") || {}).value || "";
+      const hasAny = service.trim() || qtyRaw.trim() || unitRaw.trim() || notesRaw.trim();
       if (!hasAny) return;
 
       const qtyParsed = parseAmount(qtyRaw);
@@ -4609,7 +4618,8 @@
         label: service.trim(),
         qty,
         unit_price: unit,
-        line_total: qty * unit
+        line_total: qty * unit,
+        notes: notesRaw.trim() || null
       });
     });
     if (hasPartial) {
@@ -4907,7 +4917,15 @@
       const row = document.createElement("div");
       row.className = "invoice-doc__row";
       const service = document.createElement("div");
-      service.textContent = item && item.label ? item.label : "";
+      const serviceTitle = document.createElement("div");
+      serviceTitle.textContent = item && item.label ? item.label : "";
+      service.appendChild(serviceTitle);
+      if (item && item.notes) {
+        const serviceNote = document.createElement("div");
+        serviceNote.className = "invoice-doc__line-note";
+        serviceNote.textContent = item.notes;
+        service.appendChild(serviceNote);
+      }
       const qty = document.createElement("div");
       qty.textContent = item && item.qty != null ? String(item.qty) : "1";
       const unit = document.createElement("div");
@@ -5105,6 +5123,7 @@
     if (items.length) {
       items.forEach((item) => {
         lines.push(`${item.label} | Qty: ${item.qty} | Unit price: ${formatCurrency(item.unit_price)} | Line total: ${formatCurrency(item.line_total)}`);
+        if (item.notes) lines.push(`  Details: ${item.notes}`);
       });
     }
     lines.push("");
@@ -5190,7 +5209,8 @@
       label: item.label,
       qty: item.qty,
       unit_price: item.unit_price,
-      line_total: item.line_total
+      line_total: item.line_total,
+      notes: item.notes || null
     }));
     const { error: itemError } = await CN.sb.from("invoice_items").insert(itemsPayload);
     if (itemError) throw itemError;
