@@ -3077,6 +3077,18 @@ footer{
   background: var(--table-bg);
 }
 
+#expenseFormCard{
+  margin-bottom: 12px;
+}
+
+#expensesList .data-table td:nth-child(3){
+  min-width: 260px;
+}
+
+#expensesList .btn{
+  white-space: nowrap;
+}
+
 .data-table{
   width: 100%;
   border-collapse: collapse;

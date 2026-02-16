@@ -12,6 +12,7 @@
     { key: "planner", label: "Planner" },
     { key: "schedule", label: "Schedule" },
     { key: "worklog", label: "Work log" },
+    { key: "expenses", label: "Expenses" },
     { key: "activities", label: "Activities" },
     { key: "invoices", label: "Invoices" },
     { key: "modules", label: "Modules" }
@@ -56,6 +57,10 @@
       unassignedOnly: false
     },
       worklog: {
+        month: "",
+        rows: []
+      },
+      expenses: {
         month: "",
         rows: []
       },
@@ -115,6 +120,7 @@
     adminTabPlanner: $("adminTabPlanner"),
     adminTabSchedule: $("adminTabSchedule"),
     adminTabWorklog: $("adminTabWorklog"),
+    adminTabExpenses: $("adminTabExpenses"),
     adminTabActivities: $("adminTabActivities"),
     adminTabInvoices: $("adminTabInvoices"),
     adminTabModules: $("adminTabModules"),
@@ -165,6 +171,18 @@
     worklogMonth: $("worklogMonth"),
     worklogExportCsv: $("worklogExportCsv"),
     worklogList: $("worklogList"),
+    expensesMonth: $("expensesMonth"),
+    expenseNewBtn: $("expenseNewBtn"),
+    expensesExportCsv: $("expensesExportCsv"),
+    expensesMonthTotal: $("expensesMonthTotal"),
+    expenseFormCard: $("expenseFormCard"),
+    expenseDate: $("expenseDate"),
+    expenseProperty: $("expenseProperty"),
+    expenseAmount: $("expenseAmount"),
+    expenseDescription: $("expenseDescription"),
+    expenseSaveBtn: $("expenseSaveBtn"),
+    expenseCancelBtn: $("expenseCancelBtn"),
+    expensesList: $("expensesList"),
     activitiesMonth: $("activitiesMonth"),
     activityNewBtn: $("activityNewBtn"),
     activityTypeNewBtn: $("activityTypeNewBtn"),
@@ -1766,6 +1784,23 @@
     els.invoiceProperty.value = current;
   }
 
+  function populateExpensePropertySelect(selectedId) {
+    if (!els.expenseProperty) return;
+    const current = selectedId != null ? String(selectedId) : (els.expenseProperty.value || "");
+    els.expenseProperty.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "No property";
+    els.expenseProperty.appendChild(placeholder);
+    state.properties.forEach((prop) => {
+      const opt = document.createElement("option");
+      opt.value = prop.id;
+      opt.textContent = [prop.city, prop.address].filter(Boolean).join(" | ") || prop.address || "Property";
+      els.expenseProperty.appendChild(opt);
+    });
+    els.expenseProperty.value = current;
+  }
+
   function populateInvoiceBillingContactSelect(selectedId) {
     if (!els.invoiceBillingContact) return;
     const current = selectedId || els.invoiceBillingContact.value || "";
@@ -1888,6 +1923,7 @@
     }
     populateInvoicePropertySelect();
     populateInvoiceBillingContactSelect();
+    populateExpensePropertySelect();
   }
 
   function buildPropertyStats() {
@@ -4411,6 +4447,262 @@
     downloadCsv("worklog.csv", ["Address", "Activity", "Price", "Extra price", "Timestamp"], data);
   }
 
+  function formatExpenseTimestamp(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      const raw = String(value);
+      return raw.includes("T") ? raw.replace("T", " ").slice(0, 16) : raw;
+    }
+    return fmtDateTime(date.toISOString());
+  }
+
+  function isMissingExpensesTableError(error) {
+    if (!error) return false;
+    const code = String(error.code || "");
+    const msg = String(error.message || "").toLowerCase();
+    return code === "42P01" || (msg.includes("relation") && msg.includes("expenses"));
+  }
+
+  function closeExpenseForm() {
+    if (els.expenseFormCard) els.expenseFormCard.setAttribute("hidden", "");
+  }
+
+  function openExpenseForm() {
+    if (els.expenseDate && !els.expenseDate.value) {
+      els.expenseDate.value = toDateInputValue(new Date());
+    }
+    if (els.expenseProperty) els.expenseProperty.value = "";
+    if (els.expenseAmount) els.expenseAmount.value = "";
+    if (els.expenseDescription) els.expenseDescription.value = "";
+    if (els.expenseFormCard) els.expenseFormCard.removeAttribute("hidden");
+    if (els.expenseAmount) els.expenseAmount.focus();
+  }
+
+  function updateExpensesSummary(rows) {
+    if (!els.expensesMonthTotal) return;
+    const total = (Array.isArray(rows) ? rows : []).reduce((sum, row) => {
+      const amount = Number(row && row.amount);
+      return sum + (Number.isFinite(amount) ? amount : 0);
+    }, 0);
+    els.expensesMonthTotal.textContent = `Total: ${formatCurrency(total)}`;
+  }
+
+  function renderExpenses(rows) {
+    if (!els.expensesList) return;
+    if (!rows.length) {
+      els.expensesList.innerHTML = '<div class="empty-state"><div class="empty-state__msg">No expenses for this month.</div></div>';
+      updateExpensesSummary([]);
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    const table = document.createElement("table");
+    table.className = "data-table";
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr>
+        <th>Date</th>
+        <th>Property</th>
+        <th>Description</th>
+        <th>Amount</th>
+        <th>Timestamp</th>
+        <th></th>
+      </tr>
+    `;
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    rows.forEach((item) => {
+      const row = document.createElement("tr");
+
+      const dateCell = document.createElement("td");
+      dateCell.textContent = item.expense_date || "-";
+
+      const propertyCell = document.createElement("td");
+      const city = item.property && item.property.city ? String(item.property.city) : "";
+      const address = item.property && item.property.address ? String(item.property.address) : "";
+      propertyCell.textContent = [city, address].filter(Boolean).join(" | ") || "-";
+
+      const descriptionCell = document.createElement("td");
+      descriptionCell.textContent = item.description || "-";
+      descriptionCell.title = descriptionCell.textContent;
+
+      const amountCell = document.createElement("td");
+      amountCell.textContent = Number.isFinite(Number(item.amount)) ? formatCurrency(item.amount) : "-";
+
+      const createdCell = document.createElement("td");
+      createdCell.textContent = formatExpenseTimestamp(item.created_at);
+
+      const actionCell = document.createElement("td");
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "btn btn-danger";
+      removeBtn.textContent = "Delete";
+      removeBtn.addEventListener("click", () => {
+        deleteExpense(item.id).catch((e) => toast(e.message || String(e), "error"));
+      });
+      actionCell.appendChild(removeBtn);
+
+      row.appendChild(dateCell);
+      row.appendChild(propertyCell);
+      row.appendChild(descriptionCell);
+      row.appendChild(amountCell);
+      row.appendChild(createdCell);
+      row.appendChild(actionCell);
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    els.expensesList.innerHTML = "";
+    els.expensesList.appendChild(wrap);
+    updateExpensesSummary(rows);
+  }
+
+  function renderExpensesSchemaHint() {
+    if (!els.expensesList) return;
+    els.expensesList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state__msg">Expenses table is missing in Supabase. Run the SQL script first: <code>db_expenses_module.sql</code>.</div>
+      </div>
+    `;
+    updateExpensesSummary([]);
+  }
+
+  async function loadExpenses(startDate, endDate) {
+    const { data, error } = await CN.sb
+      .from("expenses")
+      .select("id, expense_date, amount, description, property_id, created_at, property:properties(city, address)")
+      .eq("tenant_id", tenantId)
+      .gte("expense_date", toDateInputValue(startDate))
+      .lte("expense_date", toDateInputValue(endDate))
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function refreshExpenses() {
+    if (!els.expensesList || !els.expensesMonth) return;
+    const monthDate = fromMonthInputValue(els.expensesMonth.value) || new Date();
+    const startDate = startOfMonth(monthDate);
+    const endDate = endOfMonth(monthDate);
+    try {
+      const rows = await loadExpenses(startDate, endDate);
+      state.expenses.month = toMonthInputValue(startDate);
+      state.expenses.rows = rows;
+      renderExpenses(rows);
+    } catch (e) {
+      if (isMissingExpensesTableError(e)) {
+        state.expenses.rows = [];
+        renderExpensesSchemaHint();
+        return;
+      }
+      throw e;
+    }
+  }
+
+  function exportExpensesCsv() {
+    const rows = state.expenses.rows || [];
+    const data = rows.map((item) => {
+      const city = item.property && item.property.city ? String(item.property.city) : "";
+      const address = item.property && item.property.address ? String(item.property.address) : "";
+      return [
+        item.expense_date || "",
+        [city, address].filter(Boolean).join(" | "),
+        item.description || "",
+        Number.isFinite(Number(item.amount)) ? formatAmount(item.amount) : "",
+        formatExpenseTimestamp(item.created_at)
+      ];
+    });
+    downloadCsv("expenses.csv", ["Date", "Property", "Description", "Amount", "Timestamp"], data);
+  }
+
+  async function saveExpense() {
+    const expenseDate = els.expenseDate ? String(els.expenseDate.value || "").trim() : "";
+    const propertyId = els.expenseProperty ? String(els.expenseProperty.value || "").trim() : "";
+    const amount = parseAmount(els.expenseAmount ? els.expenseAmount.value : "");
+    const description = els.expenseDescription ? String(els.expenseDescription.value || "").trim() : "";
+
+    if (!expenseDate) {
+      toast("Date is required.", "error");
+      return;
+    }
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast("Enter a valid amount.", "error");
+      return;
+    }
+    if (!description) {
+      toast("Description is required.", "error");
+      return;
+    }
+
+    try {
+      const { error } = await CN.sb.from("expenses").insert({
+        tenant_id: tenantId,
+        property_id: propertyId || null,
+        expense_date: expenseDate,
+        amount,
+        description,
+        created_by_user_id: userId
+      });
+      if (error) throw error;
+      closeExpenseForm();
+      toast("Expense saved.", "ok");
+      await refreshExpenses();
+    } catch (e) {
+      if (isMissingExpensesTableError(e)) {
+        renderExpensesSchemaHint();
+        return;
+      }
+      throw e;
+    }
+  }
+
+  async function deleteExpense(expenseId) {
+    if (!expenseId) return;
+    if (!window.confirm("Delete this expense?")) return;
+    try {
+      const { error } = await CN.sb.from("expenses").delete().eq("id", expenseId);
+      if (error) throw error;
+      toast("Expense deleted.", "ok");
+      await refreshExpenses();
+    } catch (e) {
+      if (isMissingExpensesTableError(e)) {
+        renderExpensesSchemaHint();
+        return;
+      }
+      throw e;
+    }
+  }
+
+  function wireExpensesControls() {
+    if (els.expensesMonth && !els.expensesMonth.value) {
+      els.expensesMonth.value = toMonthInputValue(new Date());
+    }
+    if (els.expenseDate && !els.expenseDate.value) {
+      els.expenseDate.value = toDateInputValue(new Date());
+    }
+    if (els.expensesMonth) {
+      els.expensesMonth.addEventListener("change", () => {
+        refreshExpenses().catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (els.expenseNewBtn) {
+      els.expenseNewBtn.addEventListener("click", openExpenseForm);
+    }
+    if (els.expenseCancelBtn) {
+      els.expenseCancelBtn.addEventListener("click", closeExpenseForm);
+    }
+    if (els.expenseSaveBtn) {
+      els.expenseSaveBtn.addEventListener("click", () => {
+        saveExpense().catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (els.expensesExportCsv) {
+      els.expensesExportCsv.addEventListener("click", exportExpensesCsv);
+    }
+  }
+
   function formatCurrency(value) {
     return `EUR ${formatAmount(value)}`;
   }
@@ -5923,6 +6215,7 @@
       planner: els.adminTabPlanner,
       schedule: els.adminTabSchedule,
       worklog: els.adminTabWorklog,
+      expenses: els.adminTabExpenses,
       activities: els.adminTabActivities,
       invoices: els.adminTabInvoices,
       modules: els.adminTabModules
@@ -5945,6 +6238,9 @@
     }
     if (tabKey === "worklog") {
       refreshWorklog().catch((e) => toast(e.message || String(e), "error"));
+    }
+    if (tabKey === "expenses") {
+      refreshExpenses().catch((e) => toast(e.message || String(e), "error"));
     }
     if (tabKey === "invoices") {
       refreshInvoices().catch((e) => toast(e.message || String(e), "error"));
@@ -5973,6 +6269,7 @@
         planner: els.adminTabPlanner,
         schedule: els.adminTabSchedule,
         worklog: els.adminTabWorklog,
+        expenses: els.adminTabExpenses,
         activities: els.adminTabActivities,
         invoices: els.adminTabInvoices,
         modules: els.adminTabModules
@@ -6238,6 +6535,7 @@
     wirePlannerControls();
     wireScheduleControls();
     wireWorklogControls();
+    wireExpensesControls();
     wireActivitiesControls();
     wireInvoiceControls();
     wireBillingContactControls();
@@ -6295,6 +6593,7 @@
     await refreshPlannerTimeline().catch(() => {});
     await refreshSchedule().catch(() => {});
     await refreshWorklog().catch(() => {});
+    await refreshExpenses().catch(() => {});
     await refreshActivities().catch(() => {});
     if (mobileStartTimeline) {
       scrollTimelineToDate(toDateInputValue(new Date()));

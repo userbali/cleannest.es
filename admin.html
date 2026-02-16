@@ -62,6 +62,7 @@
 <button class="tab-btn" data-action="admin-tab" data-tab="planner" type="button">🧭 Planner</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="schedule" type="button">📅 Schedule</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="worklog" type="button">Work log</button>
+<button class="tab-btn" data-action="admin-tab" data-tab="expenses" type="button">Expenses</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="activities" type="button">📝 Activities</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="invoices" type="button">🧾 Invoices</button>
 <button class="tab-btn" data-action="admin-tab" data-tab="modules" type="button">🧩 Modules</button>
@@ -259,6 +260,57 @@
 </div>
 </div>
 <div id="worklogList"></div>
+</div>
+<div id="adminTabExpenses" style="display:none;">
+<div class="portal-admin-head">
+<div>
+<h3 style="margin:0;">Expenses</h3>
+<p class="section-sub" style="margin:6px 0 0;">Track costs by month with optional property assignment.</p>
+</div>
+<div class="timeline-head-controls">
+<div class="timeline-head-group">
+<input aria-label="Month" class="input" id="expensesMonth" type="month"/>
+<button class="btn btn-primary" id="expenseNewBtn" type="button">+ Add</button>
+<button class="btn" id="expensesExportCsv" type="button">CSV</button>
+</div>
+<div class="timeline-head-group">
+<span class="tag" id="expensesMonthTotal">Total: EUR 0.00</span>
+</div>
+</div>
+</div>
+<div class="card" id="expenseFormCard" hidden>
+<div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+<h3 style="margin:0;">New expense</h3>
+<span class="small-note">Amount and description are required.</span>
+</div>
+<div class="row-2" style="margin-top:10px;">
+<div>
+<div class="label">Date</div>
+<input class="input" id="expenseDate" type="date"/>
+</div>
+<div>
+<div class="label">Property (optional)</div>
+<select class="input" id="expenseProperty">
+<option value="">No property</option>
+</select>
+</div>
+</div>
+<div class="row-2" style="margin-top:10px;">
+<div>
+<div class="label">Amount (EUR)</div>
+<input class="input" id="expenseAmount" min="0" placeholder="0.00" step="0.01" type="number"/>
+</div>
+<div>
+<div class="label">Description</div>
+<textarea class="input" id="expenseDescription" placeholder="e.g. Linen replacement, plumbing, taxi..." rows="2"></textarea>
+</div>
+</div>
+<div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px;">
+<button class="btn btn-primary" id="expenseSaveBtn" type="button">Save expense</button>
+<button class="btn" id="expenseCancelBtn" type="button">Cancel</button>
+</div>
+</div>
+<div id="expensesList"></div>
 </div>
 <div id="adminTabInvoices" style="display:none;">
 <div class="portal-admin-head">
@@ -680,7 +732,7 @@
 
 
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js?v=20260215-worklog"></script></body>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin.js?v=20260216-expenses"></script></body>
 </html>
 
 
