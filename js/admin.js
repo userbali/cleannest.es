@@ -5586,6 +5586,7 @@
     };
 
     appendCustomerField("Nombre y apellidos / Razon social:", "", customer.name);
+    appendCustomerField("NIE/NIF/CIF:", "", customer.taxId);
     appendCustomerField("Domicilio:", "", customer.address);
     appendCustomerField("PAIS:", "", customer.country);
 
@@ -5823,6 +5824,7 @@
     lines.push("Cliente:");
     const customer = getInvoiceCustomerFields(invoice);
     lines.push(`Nombre y apellidos / razon social: ${customer.name}`);
+    lines.push(`NIE/NIF/CIF: ${customer.taxId}`);
     lines.push(`Domicilio: ${customer.address}`);
     lines.push(`PAIS: ${customer.country}`);
     if (customer.email) lines.push(`Email: ${customer.email}`);
