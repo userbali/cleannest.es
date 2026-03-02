@@ -5530,10 +5530,7 @@
     numberMeta.className = "invoice-doc__header-number-meta";
     const issueDate = document.createElement("div");
     issueDate.textContent = `Fecha de la factura: ${invoice.issue_date || ""}`;
-    const currency = document.createElement("div");
-    currency.textContent = `Currency: ${invoice.currency || "EUR"}`;
     numberMeta.appendChild(issueDate);
-    numberMeta.appendChild(currency);
     number.appendChild(numberValue);
     number.appendChild(numberMeta);
 
