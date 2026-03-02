@@ -5651,6 +5651,16 @@
     total.textContent = `Total: ${formatCurrency(totalValue || 0)}`;
     doc.appendChild(total);
 
+    const totalsExtra = document.createElement("div");
+    totalsExtra.className = "invoice-doc__totals-extra";
+    const igicLine = document.createElement("div");
+    igicLine.textContent = "IGIC 0,00 EUR";
+    const irpfLine = document.createElement("div");
+    irpfLine.textContent = "Retencion IRPF 0,00 EUR";
+    totalsExtra.appendChild(igicLine);
+    totalsExtra.appendChild(irpfLine);
+    doc.appendChild(totalsExtra);
+
     const note = document.createElement("div");
     note.className = "invoice-doc__note";
     note.textContent = "EXENTO DE IGIC POR FRANQUICIA FISCAL";
