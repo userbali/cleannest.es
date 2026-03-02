@@ -5529,7 +5529,7 @@
     const numberMeta = document.createElement("div");
     numberMeta.className = "invoice-doc__header-number-meta";
     const issueDate = document.createElement("div");
-    issueDate.textContent = `Issue date: ${invoice.issue_date || ""}`;
+    issueDate.textContent = `Fecha de la factura: ${invoice.issue_date || ""}`;
     const currency = document.createElement("div");
     currency.textContent = `Currency: ${invoice.currency || "EUR"}`;
     numberMeta.appendChild(issueDate);
@@ -5548,7 +5548,7 @@
       issuerBlock.className = "invoice-doc__block";
       const issuerLabel = document.createElement("div");
       issuerLabel.className = "label";
-      issuerLabel.textContent = "Issuer";
+      issuerLabel.textContent = "Emisor";
       const issuerBody = document.createElement("div");
       issuerBody.className = "invoice-doc__text";
       issuerBody.textContent = issuerText;
@@ -5561,13 +5561,9 @@
     customerBlock.className = "invoice-doc__block";
     const customerLabel = document.createElement("div");
     customerLabel.className = "label";
-    customerLabel.textContent = "Customer";
-    const customerSubLabel = document.createElement("div");
-    customerSubLabel.className = "invoice-doc__sub-label";
-    customerSubLabel.textContent = "Cliente (destinatario)";
+    customerLabel.textContent = "Cliente (destinatario)";
     const customer = getInvoiceCustomerFields(invoice);
     customerBlock.appendChild(customerLabel);
-    customerBlock.appendChild(customerSubLabel);
 
     const customerFields = document.createElement("div");
     customerFields.className = "invoice-doc__fields";
@@ -5592,10 +5588,9 @@
       customerFields.appendChild(field);
     };
 
-    appendCustomerField("Name / Company", "Nombre y apellidos / Razon social:", customer.name);
-    appendCustomerField("TAX ID/NIE/NIF/CIF:", "", customer.taxId);
-    appendCustomerField("Address/Domicilio:", "", customer.address);
-    appendCustomerField("Country/Pais:", "", customer.country);
+    appendCustomerField("Nombre y apellidos / Razon social:", "", customer.name);
+    appendCustomerField("Domicilio:", "", customer.address);
+    appendCustomerField("PAIS:", "", customer.country);
 
     customerBlock.appendChild(customerFields);
     doc.appendChild(customerBlock);
@@ -5815,15 +5810,14 @@
   function buildInvoiceEmailBody(invoice) {
     const items = Array.isArray(invoice.invoice_items) ? invoice.invoice_items : [];
     const lines = [];
-    lines.push(`Invoice ${invoice.invoice_number || ""}`);
-    lines.push(`Issue date: ${invoice.issue_date || ""}`);
+    lines.push(`Factura ${invoice.invoice_number || ""}`);
+    lines.push(`Fecha de la factura: ${invoice.issue_date || ""}`);
     lines.push("");
-    lines.push("Customer:");
+    lines.push("Cliente:");
     const customer = getInvoiceCustomerFields(invoice);
-    lines.push(`Name / company nombre y apellidos / razon social: ${customer.name}`);
-    lines.push(`TAX ID/NIE/NIF/CIF: ${customer.taxId}`);
-    lines.push(`Address/Domicilio: ${customer.address}`);
-    lines.push(`Country/Pais: ${customer.country}`);
+    lines.push(`Nombre y apellidos / razon social: ${customer.name}`);
+    lines.push(`Domicilio: ${customer.address}`);
+    lines.push(`PAIS: ${customer.country}`);
     if (customer.email) lines.push(`Email: ${customer.email}`);
     lines.push("");
     lines.push("Service:");
