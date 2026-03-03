@@ -1511,12 +1511,18 @@
     if (taskDetail.addOnAmount) taskDetail.addOnAmount.value = "";
     renderTaskPricing(task, prop);
 
-    const [refRaw, workRaw] = await Promise.all([
+    const [propertyRefRaw, taskRefRaw, workRaw] = await Promise.all([
       loadMediaLinks({ propertyId: task.property_id, tag: "reference" }),
+      loadMediaLinks({ taskId: task.id, tag: "reference" }),
       loadMediaLinks({ taskId: task.id })
     ]);
-    const refItems = await attachSignedUrls(refRaw);
-    const workItems = await attachSignedUrls(workRaw);
+    const refById = new Map();
+    [...propertyRefRaw, ...taskRefRaw].forEach((item) => {
+      if (!item || !item.id) return;
+      refById.set(item.id, item);
+    });
+    const refItems = await attachSignedUrls(Array.from(refById.values()));
+    const workItems = await attachSignedUrls((workRaw || []).filter((item) => item && item.tag !== "reference"));
 
     renderGallery(detail.refGallery, refItems, {
       canDelete: true,

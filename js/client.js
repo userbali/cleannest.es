@@ -299,6 +299,27 @@
     return map;
   }
 
+  async function loadTaskReferencePhotos(taskIds) {
+    const ids = Array.isArray(taskIds) ? taskIds.filter(Boolean) : [];
+    if (!ids.length) return new Map();
+    const { data, error } = await CN.sb
+      .from("media_links")
+      .select("id, task_id, tag, created_at, media:media(id, path, mime_type, created_at)")
+      .in("task_id", ids)
+      .eq("tag", "reference")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const withUrls = await attachSignedUrls(data || []);
+    const map = new Map();
+    withUrls.forEach((item) => {
+      const taskId = item && item.task_id ? String(item.task_id) : "";
+      if (!taskId) return;
+      if (!map.has(taskId)) map.set(taskId, []);
+      map.get(taskId).push(item);
+    });
+    return map;
+  }
+
   async function loadPropertyReferencePhotos(propertyIds) {
     const ids = Array.isArray(propertyIds) ? propertyIds.filter(Boolean) : [];
     if (!ids.length) return new Map();
@@ -456,9 +477,10 @@
         if (propertyId) propertyPhotoIds.add(propertyId);
         checklistIds.add(task.id);
       });
-      const [taskPhotosByTask, referencePhotosByProperty] = await Promise.all([
+      const [taskPhotosByTask, referencePhotosByProperty, referencePhotosByTask] = await Promise.all([
         loadTaskWorkPhotos(Array.from(taskPhotoIds)),
-        loadPropertyReferencePhotos(Array.from(propertyPhotoIds))
+        loadPropertyReferencePhotos(Array.from(propertyPhotoIds)),
+        loadTaskReferencePhotos(Array.from(taskPhotoIds))
       ]);
       const photosByTask = new Map();
       allTasks.forEach((task) => {
@@ -466,7 +488,18 @@
         const propertyId = task.property_id
           ? String(task.property_id)
           : (task.property && task.property.id ? String(task.property.id) : "");
-        const refs = propertyId ? (referencePhotosByProperty.get(propertyId) || []) : [];
+        const refById = new Map();
+        const propertyRefs = propertyId ? (referencePhotosByProperty.get(propertyId) || []) : [];
+        propertyRefs.forEach((item) => {
+          if (!item || !item.id) return;
+          refById.set(item.id, item);
+        });
+        const taskRefs = referencePhotosByTask.get(task.id) || [];
+        taskRefs.forEach((item) => {
+          if (!item || !item.id) return;
+          refById.set(item.id, item);
+        });
+        const refs = Array.from(refById.values());
         const work = taskPhotosByTask.get(task.id) || [];
         photosByTask.set(task.id, [...refs, ...work]);
       });
