@@ -2835,6 +2835,29 @@ footer{
   background: var(--surface2);
 }
 
+.client-photo-columns{
+  margin-top: 10px;
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.client-photo-col{
+  min-width: 0;
+}
+
+.client-photo-col .gallery{
+  margin-top: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.client-photo-col .small-note{
+  padding: 10px 12px;
+  border: 1px dashed var(--stroke);
+  border-radius: 12px;
+  background: var(--surface2);
+}
+
 .check-item{
   display:flex;
   gap: 10px;
@@ -3016,6 +3039,11 @@ footer{
 
 @media (max-width: 760px){
   .client-checklists{ grid-template-columns: 1fr; }
+  .client-photo-columns{ grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px){
+  .client-photo-col .gallery{ grid-template-columns: 1fr; }
 }
 
 

@@ -200,9 +200,7 @@
       container.innerHTML = '<div class="small-note">No photos yet.</div>';
       return;
     }
-    const gallery = document.createElement("div");
-    gallery.className = "gallery";
-    list.forEach((item) => {
+    function buildPhotoCard(item) {
       const shot = document.createElement("div");
       shot.className = "shot";
       const img = document.createElement("img");
@@ -218,14 +216,50 @@
       date.className = "date";
       const photoDate = fmtPhotoDate(item.media && item.media.created_at) || "";
       const dateParts = [];
-      if (item.tag === "reference") dateParts.push("Reference");
+      const rawTag = String(item.tag || "").trim();
+      if (rawTag && rawTag !== "reference") {
+        const normalizedTag = rawTag.replace(/[_-]+/g, " ").trim();
+        dateParts.push(normalizedTag);
+      }
       if (photoDate) dateParts.push(photoDate);
-      date.textContent = dateParts.join(" • ") || "";
+      date.textContent = dateParts.join(" - ") || "Uploaded";
       shot.appendChild(date);
 
-      gallery.appendChild(shot);
-    });
-    container.appendChild(gallery);
+      return shot;
+    }
+
+    function buildPhotoColumn(title, photos, emptyMessage) {
+      const col = document.createElement("div");
+      col.className = "client-photo-col";
+      const colLabel = document.createElement("div");
+      colLabel.className = "label";
+      colLabel.textContent = title;
+      col.appendChild(colLabel);
+
+      if (!photos.length) {
+        const empty = document.createElement("div");
+        empty.className = "small-note";
+        empty.textContent = emptyMessage;
+        col.appendChild(empty);
+        return col;
+      }
+
+      const gallery = document.createElement("div");
+      gallery.className = "gallery";
+      photos.forEach((item) => {
+        gallery.appendChild(buildPhotoCard(item));
+      });
+      col.appendChild(gallery);
+      return col;
+    }
+
+    const referencePhotos = list.filter((item) => item.tag === "reference");
+    const uploadedPhotos = list.filter((item) => item.tag !== "reference");
+    const columns = document.createElement("div");
+    columns.className = "client-photo-columns";
+    columns.appendChild(buildPhotoColumn("Reference photos", referencePhotos, "No reference photos yet."));
+    columns.appendChild(buildPhotoColumn("Uploaded photos", uploadedPhotos, "No uploaded photos yet."));
+    container.appendChild(columns);
   }
 
   async function loadTaskPhotos(taskIds) {
