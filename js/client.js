@@ -262,13 +262,14 @@
     container.appendChild(columns);
   }
 
-  async function loadTaskPhotos(taskIds) {
+  async function loadTaskWorkPhotos(taskIds) {
     const ids = Array.isArray(taskIds) ? taskIds.filter(Boolean) : [];
     if (!ids.length) return new Map();
     const { data, error } = await CN.sb
       .from("media_links")
       .select("id, task_id, tag, created_at, media:media(id, path, mime_type, created_at)")
       .in("task_id", ids)
+      .neq("tag", "reference")
       .order("created_at", { ascending: false });
     if (error) throw error;
     const withUrls = await attachSignedUrls(data || []);
@@ -298,11 +299,32 @@
     return map;
   }
 
+  async function loadPropertyReferencePhotos(propertyIds) {
+    const ids = Array.isArray(propertyIds) ? propertyIds.filter(Boolean) : [];
+    if (!ids.length) return new Map();
+    const { data, error } = await CN.sb
+      .from("media_links")
+      .select("id, property_id, tag, created_at, media:media(id, path, mime_type, created_at)")
+      .in("property_id", ids)
+      .eq("tag", "reference")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const withUrls = await attachSignedUrls(data || []);
+    const map = new Map();
+    withUrls.forEach((item) => {
+      const propertyId = item && item.property_id ? String(item.property_id) : "";
+      if (!propertyId) return;
+      if (!map.has(propertyId)) map.set(propertyId, []);
+      map.get(propertyId).push(item);
+    });
+    return map;
+  }
+
   async function loadUpcoming() {
     const today = toDateInputValue(new Date());
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, property:properties(address), label:task_labels(name)")
+      .select("id, property_id, day_date, status, duration_minutes, start_at, end_at, notes, property:properties(id, address), label:task_labels(name)")
       .gte("day_date", today)
       .neq("status", "done")
       .neq("status", "canceled")
@@ -314,7 +336,7 @@
   async function loadHistory() {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, property:properties(address), label:task_labels(name)")
+      .select("id, property_id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, property:properties(id, address), label:task_labels(name)")
       .eq("status", "done")
       .order("completed_at", { ascending: false, nullsFirst: false })
       .order("day_date", { ascending: false })
@@ -422,15 +444,32 @@
   async function refresh() {
     try {
       const [upcoming, history] = await Promise.all([loadUpcoming(), loadHistory()]);
-      const photoIds = new Set();
+      const taskPhotoIds = new Set();
+      const propertyPhotoIds = new Set();
       const checklistIds = new Set();
-      history.forEach((task) => photoIds.add(task.id));
-      upcoming.forEach((task) => {
-        photoIds.add(task.id);
+      const allTasks = [...upcoming, ...history];
+      allTasks.forEach((task) => {
+        if (task && task.id) taskPhotoIds.add(task.id);
+        const propertyId = task && task.property_id
+          ? String(task.property_id)
+          : (task && task.property && task.property.id ? String(task.property.id) : "");
+        if (propertyId) propertyPhotoIds.add(propertyId);
         checklistIds.add(task.id);
       });
-      history.forEach((task) => checklistIds.add(task.id));
-      const photosByTask = await loadTaskPhotos(Array.from(photoIds));
+      const [taskPhotosByTask, referencePhotosByProperty] = await Promise.all([
+        loadTaskWorkPhotos(Array.from(taskPhotoIds)),
+        loadPropertyReferencePhotos(Array.from(propertyPhotoIds))
+      ]);
+      const photosByTask = new Map();
+      allTasks.forEach((task) => {
+        if (!task || !task.id) return;
+        const propertyId = task.property_id
+          ? String(task.property_id)
+          : (task.property && task.property.id ? String(task.property.id) : "");
+        const refs = propertyId ? (referencePhotosByProperty.get(propertyId) || []) : [];
+        const work = taskPhotosByTask.get(task.id) || [];
+        photosByTask.set(task.id, [...refs, ...work]);
+      });
       const checklistsByTask = await loadChecklists(Array.from(checklistIds));
       renderList(upcomingEl, upcoming, "No upcoming cleanings.", { photosByTask, showPhotos: true, checklistsByTask, showChecklist: true });
       renderList(historyEl, history, "No history yet.", { photosByTask, showPhotos: true, checklistsByTask, showChecklist: true, useCompletedAt: true });
