@@ -2398,8 +2398,23 @@
       addrInput.value = property.address || "";
       addrWrap.appendChild(addrLabel);
       addrWrap.appendChild(addrInput);
+      const phoneWrap = document.createElement("div");
+      const phoneLabel = document.createElement("div");
+      phoneLabel.className = "label";
+      phoneLabel.textContent = "Phone";
+      const phoneInput = document.createElement("input");
+      phoneInput.className = "input";
+      phoneInput.placeholder = "Phone";
+      phoneInput.value = owner ? owner.phone || "" : "";
+      phoneWrap.appendChild(phoneLabel);
+      phoneWrap.appendChild(phoneInput);
       editForm.appendChild(cityWrap);
       editForm.appendChild(addrWrap);
+      const phoneRow = document.createElement("div");
+      phoneRow.className = "row-2";
+      phoneRow.style.marginTop = "8px";
+      phoneRow.appendChild(phoneWrap);
+      phoneRow.appendChild(document.createElement("div"));
       const editActions = document.createElement("div");
       editActions.className = "row";
       editActions.style.justifyContent = "flex-end";
@@ -2415,6 +2430,7 @@
       editActions.appendChild(editCancel);
       editActions.appendChild(editSave);
       editPanel.appendChild(editForm);
+      editPanel.appendChild(phoneRow);
       editPanel.appendChild(editActions);
       preview.appendChild(editPanel);
 
@@ -2423,6 +2439,7 @@
         if (!editPanel.hidden) {
           cityInput.value = property.city || "";
           addrInput.value = property.address || "";
+          phoneInput.value = owner ? owner.phone || "" : "";
         }
       });
       editCancel.addEventListener("click", () => {
@@ -2431,6 +2448,7 @@
         editSave.addEventListener("click", async () => {
         const nextCity = cityInput.value.trim();
         const nextAddress = addrInput.value.trim();
+        const nextPhone = phoneInput.value.trim() || null;
         if (!nextCity) {
           toast("City is required.", "error");
           return;
@@ -2440,6 +2458,15 @@
           return;
         }
         try {
+          const ownerId = property.owner_user_id || (owner ? owner.id : "");
+          if (ownerId) {
+            const { error: ownerError } = await CN.sb
+              .from("profiles")
+              .update({ phone: nextPhone })
+              .eq("id", ownerId)
+              .eq("tenant_id", tenantId);
+            if (ownerError) throw ownerError;
+          }
           const { error } = await CN.sb
             .from("properties")
             .update({ city: nextCity, address: nextAddress })
@@ -2452,6 +2479,10 @@
           }
           property.city = nextCity;
           property.address = nextAddress;
+          if (owner) owner.phone = nextPhone || "";
+          if (row && row.owner) row.owner.phone = nextPhone || "";
+          const clientRow = state.clients.find((c) => c.id === ownerId);
+          if (clientRow) clientRow.phone = nextPhone || "";
           toast("Property updated.", "ok");
           editPanel.hidden = true;
           renderClientsList();
@@ -2460,7 +2491,7 @@
           toast(e.message || String(e), "error");
         }
       });
-        [cityInput, addrInput].forEach((input) => {
+        [cityInput, addrInput, phoneInput].forEach((input) => {
           input.addEventListener("keydown", (ev) => {
             if (ev.key === "Enter") editSave.click();
             if (ev.key === "Escape") editCancel.click();
