@@ -73,6 +73,16 @@
     return `${toDateInputValue(d)} ${time}`;
   }
 
+  const SETUP_LABEL_PREFIX = "SETUP::";
+  function isSetupLabel(label) {
+    return String(label || "").startsWith(SETUP_LABEL_PREFIX);
+  }
+
+  function stripSetupLabel(label) {
+    const raw = String(label || "");
+    return isSetupLabel(raw) ? raw.slice(SETUP_LABEL_PREFIX.length) : raw;
+  }
+
   function statusBadge(status) {
     if (status === "in_progress") return { label: "In progress", className: "in_progress" };
     if (status === "done") return { label: "Completed", className: "completed" };
@@ -115,28 +125,71 @@
     });
   }
 
-  function renderChecklist(container, items) {
+  function renderChecklistList(container, items, options) {
     if (!container) return;
     container.innerHTML = "";
     const list = Array.isArray(items) ? items : [];
-    if (!list.length) return;
+    const type = options && options.type === "setup" ? "setup" : "checklist";
+    if (!list.length) {
+      container.innerHTML = `<div class="small-note">${type === "setup" ? "No setup items yet." : "No checklist items yet."}</div>`;
+      return;
+    }
     const box = document.createElement("div");
     box.className = "checklist";
     list.forEach((item) => {
       const row = document.createElement("div");
       row.className = "check-item";
+      const setupItem = Boolean(options && options.setup);
+      if (setupItem) row.classList.add("is-setup");
       const input = document.createElement("input");
       input.type = "checkbox";
       input.disabled = true;
       input.checked = Boolean(item.done);
       const label = document.createElement("label");
-      label.textContent = item.label || "Checklist item";
+      label.textContent = stripSetupLabel(item.label) || (setupItem ? "Setup item" : "Checklist item");
       if (item.done) label.classList.add("done");
       row.appendChild(input);
       row.appendChild(label);
       box.appendChild(row);
     });
     container.appendChild(box);
+  }
+
+  function renderChecklistColumns(container, items) {
+    if (!container) return;
+    container.innerHTML = "";
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) return;
+
+    const checklistItems = list.filter((item) => !isSetupLabel(item.label));
+    const setupItems = list.filter((item) => isSetupLabel(item.label));
+
+    const grid = document.createElement("div");
+    grid.className = "client-checklists";
+
+    const checklistCol = document.createElement("div");
+    checklistCol.className = "client-checklist-col";
+    const checklistLabel = document.createElement("div");
+    checklistLabel.className = "label";
+    checklistLabel.textContent = "Checklist";
+    checklistCol.appendChild(checklistLabel);
+    const checklistBody = document.createElement("div");
+    renderChecklistList(checklistBody, checklistItems, { type: "checklist", setup: false });
+    checklistCol.appendChild(checklistBody);
+    grid.appendChild(checklistCol);
+
+    const setupCol = document.createElement("div");
+    setupCol.className = "client-checklist-col";
+    const setupLabel = document.createElement("div");
+    setupLabel.className = "label";
+    setupLabel.textContent = "Setup";
+    setupCol.appendChild(setupLabel);
+    const setupBody = document.createElement("div");
+    renderChecklistList(setupBody, setupItems, { type: "setup", setup: true });
+    setupCol.appendChild(setupBody);
+    grid.appendChild(setupCol);
+
+    container.appendChild(grid);
   }
 
   function renderGallery(container, items) {
@@ -163,7 +216,11 @@
 
       const date = document.createElement("div");
       date.className = "date";
-      date.textContent = fmtPhotoDate(item.media && item.media.created_at) || "";
+      const photoDate = fmtPhotoDate(item.media && item.media.created_at) || "";
+      const dateParts = [];
+      if (item.tag === "reference") dateParts.push("Reference");
+      if (photoDate) dateParts.push(photoDate);
+      date.textContent = dateParts.join(" • ") || "";
       shot.appendChild(date);
 
       gallery.appendChild(shot);
@@ -178,7 +235,6 @@
       .from("media_links")
       .select("id, task_id, tag, created_at, media:media(id, path, mime_type, created_at)")
       .in("task_id", ids)
-      .neq("tag", "reference")
       .order("created_at", { ascending: false });
     if (error) throw error;
     const withUrls = await attachSignedUrls(data || []);
@@ -309,12 +365,8 @@
       if (showChecklist && checklistsByTask) {
         const checklistItems = checklistsByTask.get(task.id) || [];
         if (checklistItems.length) {
-          const checklistLabel = document.createElement("div");
-          checklistLabel.className = "label";
-          checklistLabel.textContent = "Checklist";
-          card.appendChild(checklistLabel);
           const checklistWrap = document.createElement("div");
-          renderChecklist(checklistWrap, checklistItems);
+          renderChecklistColumns(checklistWrap, checklistItems);
           card.appendChild(checklistWrap);
         }
       }
@@ -340,7 +392,7 @@
       const checklistIds = new Set();
       history.forEach((task) => photoIds.add(task.id));
       upcoming.forEach((task) => {
-        if (task.status === "in_progress") photoIds.add(task.id);
+        photoIds.add(task.id);
         checklistIds.add(task.id);
       });
       history.forEach((task) => checklistIds.add(task.id));

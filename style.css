@@ -2813,6 +2813,28 @@ footer{
   gap: 10px;
 }
 
+.client-checklists{
+  margin-top: 10px;
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.client-checklist-col{
+  min-width: 0;
+}
+
+.client-checklist-col .checklist{
+  margin-top: 0;
+}
+
+.client-checklist-col .small-note{
+  padding: 10px 12px;
+  border: 1px dashed var(--stroke);
+  border-radius: 12px;
+  background: var(--surface2);
+}
+
 .check-item{
   display:flex;
   gap: 10px;
@@ -2990,6 +3012,10 @@ footer{
 @media (max-width: 980px){
   .cx-overview-body{ grid-template-columns: 1fr; }
   .cx-staff-grid{ grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px){
+  .client-checklists{ grid-template-columns: 1fr; }
 }
 
 
