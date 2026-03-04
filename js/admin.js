@@ -618,8 +618,9 @@
     return `${tenantId}/properties/${propertyId}/reference/${newId()}${fileExt(file)}`;
   }
 
-  function buildWorkPath(taskId, file) {
-    return `${tenantId}/tasks/${taskId}/work/${newId()}${fileExt(file)}`;
+  function buildWorkPath(taskId, file, sourceHash) {
+    const prefix = sourceHash ? `${String(sourceHash).toLowerCase()}_` : "";
+    return `${tenantId}/tasks/${taskId}/work/${prefix}${newId()}${fileExt(file)}`;
   }
 
   const referenceHashCache = new Map();
@@ -635,6 +636,12 @@
   function withFileExtension(fileName, extension) {
     const base = String(fileName || "reference").replace(/\.[^.]+$/, "");
     return `${base}${extension}`;
+  }
+
+  function extractWorkSourceHashFromPath(path) {
+    const raw = String(path || "");
+    const m = raw.match(/\/work\/([a-f0-9]{64})_/i);
+    return m ? String(m[1]).toLowerCase() : "";
   }
 
   function canvasToBlob(canvas, mimeType, quality) {
@@ -691,11 +698,8 @@
     ctx.drawImage(img, 0, 0, width, height);
 
     const stamp = new Date().toISOString().slice(0, 10);
-    const shortProperty = String(propertyId || "").slice(0, 8).toUpperCase() || "PROPERTY";
-    const watermarkText = `REFERENCE | CLEAN-NEST | ${stamp} | ${shortProperty}`;
-    const fontSize = Math.max(18, Math.round(Math.min(width, height) / 18));
-    const stepX = Math.max(240, Math.round(fontSize * 8));
-    const stepY = Math.max(140, Math.round(fontSize * 3.2));
+    const watermarkText = `REFERENCE | ${stamp}`;
+    const fontSize = Math.max(18, Math.round(Math.min(width, height) / 20));
 
     ctx.save();
     ctx.translate(width / 2, height / 2);
@@ -707,13 +711,79 @@
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "rgba(0,0,0,0.45)";
     ctx.lineWidth = Math.max(1, Math.round(fontSize / 14));
+    const metrics = ctx.measureText(watermarkText);
+    const stepX = Math.max(Math.round(metrics.width + fontSize * 2.8), 280);
+    const stepY = Math.max(Math.round(fontSize * 3.8), 170);
+    let row = 0;
 
     for (let y = -height; y <= height; y += stepY) {
+      const rowShift = row % 2 === 0 ? 0 : Math.round(stepX / 2);
       for (let x = -width; x <= width; x += stepX) {
-        ctx.strokeText(watermarkText, x, y);
-        ctx.fillText(watermarkText, x, y);
+        const drawX = x + rowShift;
+        ctx.strokeText(watermarkText, drawX, y);
+        ctx.fillText(watermarkText, drawX, y);
       }
+      row += 1;
     }
+    ctx.restore();
+
+    const outputType = /^image\/(png|jpeg|webp)$/i.test(mimeType) ? mimeType : "image/jpeg";
+    const quality = outputType === "image/png" ? undefined : 0.92;
+    const blob = await canvasToBlob(canvas, outputType, quality);
+    const ext = extFromMimeType(blob.type || outputType);
+    return new File([blob], withFileExtension(file.name, ext), {
+      type: blob.type || outputType,
+      lastModified: Date.now()
+    });
+  }
+
+  async function watermarkWorkFile(file) {
+    const mimeType = String(file && file.type ? file.type : "");
+    if (!mimeType.startsWith("image/")) return file;
+
+    const img = await loadImageFromBlob(file);
+    const width = img.naturalWidth || img.width || 0;
+    const height = img.naturalHeight || img.height || 0;
+    if (!width || !height) throw new Error("Invalid work image.");
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to create image context.");
+
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const stamp = new Date().toISOString().replace("T", " ").slice(0, 16);
+    const text = `WORK ${stamp}`;
+    const fontSize = Math.max(14, Math.round(Math.min(width, height) / 24));
+    const padX = Math.round(fontSize * 0.8);
+    const padY = Math.round(fontSize * 0.45);
+    const jitterX = (Math.random() * 0.3 - 0.15) * width;
+    const jitterY = (Math.random() * 0.24 - 0.12) * height;
+    const centerX = width / 2 + jitterX;
+    const centerY = height / 2 + jitterY;
+    const angle = (Math.random() * 20 - 10) * (Math.PI / 180);
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(angle);
+    ctx.font = `700 ${fontSize}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const metrics = ctx.measureText(text);
+    const boxW = Math.ceil(metrics.width + padX * 2);
+    const boxH = Math.ceil(fontSize + padY * 2);
+    const boxX = -boxW / 2;
+    const boxY = -boxH / 2;
+
+    ctx.fillStyle = "rgba(0,0,0,0.26)";
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    ctx.lineWidth = Math.max(1, Math.round(fontSize / 14));
+    ctx.strokeStyle = "rgba(0,0,0,0.45)";
+    ctx.strokeText(text, 0, 0);
+    ctx.fillStyle = "rgba(255,255,255,0.82)";
+    ctx.fillText(text, 0, 0);
     ctx.restore();
 
     const outputType = /^image\/(png|jpeg|webp)$/i.test(mimeType) ? mimeType : "image/jpeg";
@@ -758,6 +828,19 @@
       } catch {}
     }
     referenceHashCache.set(key, hashes);
+    return hashes;
+  }
+
+  async function getUsedWorkSourceHashSet(propertyId) {
+    const key = String(propertyId || "");
+    if (!key) return new Set();
+    const raw = await loadMediaLinks({ propertyId: key });
+    const hashes = new Set();
+    (raw || []).forEach((item) => {
+      if (!item || item.tag === "reference") return;
+      const hash = extractWorkSourceHashFromPath(item.media && item.media.path);
+      if (hash) hashes.add(hash);
+    });
     return hashes;
   }
 
@@ -1571,25 +1654,28 @@
     const task = taskDetail.currentTask;
     if (!task) return;
     const referenceHashes = task.property_id ? await getReferenceHashSet(task.property_id, true) : new Set();
+    const usedWorkHashes = task.property_id ? await getUsedWorkSourceHashSet(task.property_id) : new Set();
     let skipped = 0;
     for (const file of files) {
-      const hash = await blobSha256Hex(file);
-      if (hash && referenceHashes.has(hash)) {
+      const sourceHash = await blobSha256Hex(file);
+      if (sourceHash && (referenceHashes.has(sourceHash) || usedWorkHashes.has(sourceHash))) {
         skipped += 1;
         continue;
       }
+      const watermarked = await watermarkWorkFile(file);
       await uploadMediaAndLink({
-        file,
-        path: buildWorkPath(task.id, file),
+        file: watermarked,
+        path: buildWorkPath(task.id, watermarked, sourceHash),
         propertyId: task.property_id,
         taskId: task.id,
         tag: "after"
       });
+      if (sourceHash) usedWorkHashes.add(sourceHash);
     }
     if (skipped) {
       toast(skipped === 1
-        ? "1 photo skipped: it matches a reference image."
-        : `${skipped} photos skipped: they match reference images.`, "error");
+        ? "1 photo skipped: reused or reference image detected."
+        : `${skipped} photos skipped: reused or reference images detected.`, "error");
     }
     await openTaskDetail(task.id);
   }
