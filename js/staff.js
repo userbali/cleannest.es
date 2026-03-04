@@ -120,6 +120,45 @@
     return `${tenantId}/tasks/${taskId}/work/${newId()}${fileExt(file)}`;
   }
 
+  const referenceHashCache = new Map();
+
+  async function blobSha256Hex(blob) {
+    const input = blob instanceof Blob ? blob : new Blob([blob]);
+    const digest = await crypto.subtle.digest("SHA-256", await input.arrayBuffer());
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  async function getReferenceHashSet(propertyId, forceRefresh = false) {
+    const key = String(propertyId || "");
+    if (!key) return new Set();
+    if (!forceRefresh && referenceHashCache.has(key)) {
+      return referenceHashCache.get(key);
+    }
+    const referenceRaw = await loadMediaLinks({ propertyId: key, tag: "reference" });
+    if (!referenceRaw.length) {
+      const empty = new Set();
+      referenceHashCache.set(key, empty);
+      return empty;
+    }
+    const referenceItems = await attachSignedUrls(referenceRaw);
+    const hashes = new Set();
+    for (const item of referenceItems) {
+      const signedUrl = item && item.signedUrl ? String(item.signedUrl) : "";
+      if (!signedUrl) continue;
+      try {
+        const res = await fetch(signedUrl, { cache: "no-store" });
+        if (!res.ok) continue;
+        const blob = await res.blob();
+        const hash = await blobSha256Hex(blob);
+        if (hash) hashes.add(hash);
+      } catch {}
+    }
+    referenceHashCache.set(key, hashes);
+    return hashes;
+  }
+
   async function loadPropertyChecklistItems(propertyId) {
     const { data, error } = await CN.sb
       .from("property_checklist_items")
@@ -475,7 +514,14 @@
   async function handleWorkUpload(files) {
     const task = taskDetail.currentTask;
     if (!task) return;
+    const referenceHashes = task.property_id ? await getReferenceHashSet(task.property_id, true) : new Set();
+    let skipped = 0;
     for (const file of files) {
+      const hash = await blobSha256Hex(file);
+      if (hash && referenceHashes.has(hash)) {
+        skipped += 1;
+        continue;
+      }
       await uploadMediaAndLink({
         file,
         path: buildWorkPath(task.id, file),
@@ -483,6 +529,11 @@
         taskId: task.id,
         tag: "after"
       });
+    }
+    if (skipped) {
+      toast(skipped === 1
+        ? "1 photo skipped: it matches a reference image."
+        : `${skipped} photos skipped: they match reference images.`, "error");
     }
     await openTaskDetail(task.id);
   }

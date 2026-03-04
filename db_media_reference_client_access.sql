@@ -99,3 +99,66 @@ using (
     )
   )
 );
+
+-- STORAGE OBJECTS (required for signed URLs to work)
+-- Use a SECURITY DEFINER helper so storage policy checks are not affected by
+-- RLS chaining on public.media / public.media_links.
+create or replace function public.can_read_media_path(p_path text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select exists (
+    select 1
+    from public.media m
+    join public.media_links ml on ml.media_id = m.id
+    where m.path = p_path
+      and ml.tenant_id = public.current_tenant_id()
+      and (
+        public.is_admin()
+        or exists (
+          select 1
+          from public.tasks t
+          where t.id = ml.task_id
+            and t.assigned_user_id = auth.uid()
+        )
+        or exists (
+          select 1
+          from public.property_staff ps
+          where ps.property_id = ml.property_id
+            and ps.staff_user_id = auth.uid()
+        )
+        or exists (
+          select 1
+          from public.tasks t
+          where t.property_id = ml.property_id
+            and t.assigned_user_id = auth.uid()
+        )
+        or exists (
+          select 1
+          from public.properties p
+          where p.id = ml.property_id
+            and p.owner_user_id = auth.uid()
+        )
+        or exists (
+          select 1
+          from public.tasks t
+          join public.properties p on p.id = t.property_id
+          where t.id = ml.task_id
+            and p.owner_user_id = auth.uid()
+        )
+      )
+  );
+$$;
+
+drop policy if exists storage_media_select on storage.objects;
+create policy storage_media_select on storage.objects
+for select
+to authenticated
+using (
+  bucket_id = 'media'
+  and public.can_read_media_path(storage.objects.name)
+);

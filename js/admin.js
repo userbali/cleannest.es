@@ -622,6 +622,145 @@
     return `${tenantId}/tasks/${taskId}/work/${newId()}${fileExt(file)}`;
   }
 
+  const referenceHashCache = new Map();
+
+  function extFromMimeType(mimeType) {
+    const value = String(mimeType || "").toLowerCase();
+    if (value.includes("png")) return ".png";
+    if (value.includes("webp")) return ".webp";
+    if (value.includes("jpeg") || value.includes("jpg")) return ".jpg";
+    return ".jpg";
+  }
+
+  function withFileExtension(fileName, extension) {
+    const base = String(fileName || "reference").replace(/\.[^.]+$/, "");
+    return `${base}${extension}`;
+  }
+
+  function canvasToBlob(canvas, mimeType, quality) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+        reject(new Error("Failed to render image blob."));
+      }, mimeType, quality);
+    });
+  }
+
+  function loadImageFromBlob(blob) {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(img);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Failed to decode image."));
+      };
+      img.src = objectUrl;
+    });
+  }
+
+  async function blobSha256Hex(blob) {
+    const input = blob instanceof Blob ? blob : new Blob([blob]);
+    const digest = await crypto.subtle.digest("SHA-256", await input.arrayBuffer());
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  async function watermarkReferenceFile(file, propertyId) {
+    const mimeType = String(file && file.type ? file.type : "");
+    if (!mimeType.startsWith("image/")) return file;
+
+    const img = await loadImageFromBlob(file);
+    const width = img.naturalWidth || img.width || 0;
+    const height = img.naturalHeight || img.height || 0;
+    if (!width || !height) throw new Error("Invalid reference image.");
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to create image context.");
+
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const shortProperty = String(propertyId || "").slice(0, 8).toUpperCase() || "PROPERTY";
+    const watermarkText = `REFERENCE | CLEAN-NEST | ${stamp} | ${shortProperty}`;
+    const fontSize = Math.max(18, Math.round(Math.min(width, height) / 18));
+    const stepX = Math.max(240, Math.round(fontSize * 8));
+    const stepY = Math.max(140, Math.round(fontSize * 3.2));
+
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(-Math.PI / 6);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `700 ${fontSize}px sans-serif`;
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.45)";
+    ctx.lineWidth = Math.max(1, Math.round(fontSize / 14));
+
+    for (let y = -height; y <= height; y += stepY) {
+      for (let x = -width; x <= width; x += stepX) {
+        ctx.strokeText(watermarkText, x, y);
+        ctx.fillText(watermarkText, x, y);
+      }
+    }
+    ctx.restore();
+
+    const outputType = /^image\/(png|jpeg|webp)$/i.test(mimeType) ? mimeType : "image/jpeg";
+    const quality = outputType === "image/png" ? undefined : 0.92;
+    const blob = await canvasToBlob(canvas, outputType, quality);
+    const ext = extFromMimeType(blob.type || outputType);
+    return new File([blob], withFileExtension(file.name, ext), {
+      type: blob.type || outputType,
+      lastModified: Date.now()
+    });
+  }
+
+  function invalidateReferenceHashCache(propertyId) {
+    const key = String(propertyId || "");
+    if (!key) return;
+    referenceHashCache.delete(key);
+  }
+
+  async function getReferenceHashSet(propertyId, forceRefresh = false) {
+    const key = String(propertyId || "");
+    if (!key) return new Set();
+    if (!forceRefresh && referenceHashCache.has(key)) {
+      return referenceHashCache.get(key);
+    }
+    const referenceRaw = await loadMediaLinks({ propertyId: key, tag: "reference" });
+    if (!referenceRaw.length) {
+      const empty = new Set();
+      referenceHashCache.set(key, empty);
+      return empty;
+    }
+    const referenceItems = await attachSignedUrls(referenceRaw);
+    const hashes = new Set();
+    for (const item of referenceItems) {
+      const signedUrl = item && item.signedUrl ? String(item.signedUrl) : "";
+      if (!signedUrl) continue;
+      try {
+        const res = await fetch(signedUrl, { cache: "no-store" });
+        if (!res.ok) continue;
+        const blob = await res.blob();
+        const hash = await blobSha256Hex(blob);
+        if (hash) hashes.add(hash);
+      } catch {}
+    }
+    referenceHashCache.set(key, hashes);
+    return hashes;
+  }
+
   async function loadPropertyChecklistItems(propertyId) {
     const { data, error } = await CN.sb
       .from("property_checklist_items")
@@ -1414,21 +1553,31 @@
   async function handleReferenceUpload(files) {
     const task = taskDetail.currentTask;
     if (!task || !task.property_id) return;
+    const propertyId = String(task.property_id);
     for (const file of files) {
+      const watermarked = await watermarkReferenceFile(file, propertyId);
       await uploadMediaAndLink({
-        file,
-        path: buildReferencePath(task.property_id, file),
-        propertyId: task.property_id,
+        file: watermarked,
+        path: buildReferencePath(propertyId, watermarked),
+        propertyId,
         tag: "reference"
       });
     }
+    invalidateReferenceHashCache(propertyId);
     await openTaskDetail(task.id);
   }
 
   async function handleWorkUpload(files) {
     const task = taskDetail.currentTask;
     if (!task) return;
+    const referenceHashes = task.property_id ? await getReferenceHashSet(task.property_id, true) : new Set();
+    let skipped = 0;
     for (const file of files) {
+      const hash = await blobSha256Hex(file);
+      if (hash && referenceHashes.has(hash)) {
+        skipped += 1;
+        continue;
+      }
       await uploadMediaAndLink({
         file,
         path: buildWorkPath(task.id, file),
@@ -1436,6 +1585,11 @@
         taskId: task.id,
         tag: "after"
       });
+    }
+    if (skipped) {
+      toast(skipped === 1
+        ? "1 photo skipped: it matches a reference image."
+        : `${skipped} photos skipped: they match reference images.`, "error");
     }
     await openTaskDetail(task.id);
   }
@@ -1530,6 +1684,7 @@
         if (!window.confirm("Delete this photo?")) return;
         try {
           await deleteMediaItem(item);
+          invalidateReferenceHashCache(task.property_id);
           await openTaskDetail(task.id);
         } catch (e) {
           toast(e.message || String(e), "error");
@@ -2852,13 +3007,15 @@
       if (!files.length) return;
       try {
         for (const file of files) {
+          const watermarked = await watermarkReferenceFile(file, property.id);
           await uploadMediaAndLink({
-            file,
-            path: buildReferencePath(property.id, file),
+            file: watermarked,
+            path: buildReferencePath(property.id, watermarked),
             propertyId: property.id,
             tag: "reference"
           });
         }
+        invalidateReferenceHashCache(property.id);
         toast("Reference photos uploaded.", "ok");
         await renderPropertyDetail(property);
       } catch (e) {
@@ -2880,6 +3037,7 @@
           if (!window.confirm("Delete this photo?")) return;
           try {
             await deleteMediaItem(item);
+            invalidateReferenceHashCache(property.id);
             await renderPropertyDetail(property);
           } catch (e) {
             toast(e.message || String(e), "error");
