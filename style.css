@@ -1846,10 +1846,25 @@ footer{
   width:auto;
 }
 
+.invoice-doc__logo-text-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  min-width:0;
+}
+
 .invoice-doc__logo-text{
   font-weight: 800;
   font-size: 18px;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.invoice-doc__logo-site{
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: #4b5563;
   white-space: nowrap;
 }
 

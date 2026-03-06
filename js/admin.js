@@ -5792,11 +5792,18 @@
     const logo = document.createElement("img");
     logo.alt = "Clean-Nest logo";
     logo.src = "pics/logo.png";
+    const logoTextWrap = document.createElement("div");
+    logoTextWrap.className = "invoice-doc__logo-text-wrap";
     const logoText = document.createElement("div");
     logoText.className = "invoice-doc__logo-text";
     logoText.textContent = "Clean-Nest";
+    const logoSite = document.createElement("div");
+    logoSite.className = "invoice-doc__logo-site";
+    logoSite.textContent = "www.cleannest.es";
+    logoTextWrap.appendChild(logoText);
+    logoTextWrap.appendChild(logoSite);
     logoWrap.appendChild(logo);
-    logoWrap.appendChild(logoText);
+    logoWrap.appendChild(logoTextWrap);
 
     const title = document.createElement("div");
     title.className = "invoice-doc__header-title";
