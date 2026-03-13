@@ -80,6 +80,7 @@ async function sendCompletionEmail(resendKey: string, from: string, to: string, 
     `Hi ${safeName},`,
     "",
     `Just a quick note to let you know that the cleaning for ${safeAddress} has been completed on ${completedDate}.`,
+    "You can now review the freshly completed photos in your Clean-Nest portal.",
     "",
     "Best regards,",
     "Clean-Nest team"
@@ -87,6 +88,7 @@ async function sendCompletionEmail(resendKey: string, from: string, to: string, 
   const html = `
     <p>Hi ${safeName},</p>
     <p>Just a quick note to let you know that the cleaning for <strong>${safeAddress}</strong> has been completed on ${completedDate}.</p>
+    <p>You can now review the freshly completed photos in your Clean-Nest portal.</p>
     <p>Best regards,<br/>Clean-Nest team</p>
   `;
   const payload = {
