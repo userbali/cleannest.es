@@ -38,6 +38,8 @@
     meta: null,
     checklist: null,
     checklistHint: null,
+    checklistNoteInput: null,
+    checklistNoteSaveBtn: null,
     refGallery: null,
     workGallery: null,
     workUploadBtn: null,
@@ -335,7 +337,7 @@
   async function loadTaskDetail(taskId) {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, assigned_user_id, property_id, label_id, property:properties(address), label:task_labels(name)")
+      .select("id, day_date, status, duration_minutes, start_at, end_at, notes, checklist_note, assigned_user_id, property_id, label_id, property:properties(address), label:task_labels(name)")
       .eq("id", taskId)
       .single();
     if (error) throw error;
@@ -515,6 +517,14 @@
                 <span class="small-note" id="taskChecklistHint"></span>
               </div>
               <div class="checklist" id="taskChecklistList"></div>
+              <div class="checklist-note-editor">
+                <label class="label" for="taskChecklistNote">Checklist note</label>
+                <textarea class="input checklist-note-input" id="taskChecklistNote" rows="3" maxlength="2000" placeholder="Explain why an item could not be completed."></textarea>
+                <div class="row checklist-note-actions">
+                  <span class="small-note">Visible to the client.</span>
+                  <button class="btn" id="taskChecklistNoteSave" type="button">Save note</button>
+                </div>
+              </div>
             </div>
             <div class="card">
               <div class="row" style="justify-content:space-between; align-items:center;">
@@ -545,6 +555,8 @@
     taskDetail.meta = modal.querySelector("#taskDetailMeta");
     taskDetail.checklist = modal.querySelector("#taskChecklistList");
     taskDetail.checklistHint = modal.querySelector("#taskChecklistHint");
+    taskDetail.checklistNoteInput = modal.querySelector("#taskChecklistNote");
+    taskDetail.checklistNoteSaveBtn = modal.querySelector("#taskChecklistNoteSave");
     taskDetail.refGallery = modal.querySelector("#taskRefGallery");
     taskDetail.workGallery = modal.querySelector("#taskWorkGallery");
     taskDetail.workUploadBtn = modal.querySelector("#taskWorkUpload");
@@ -592,6 +604,11 @@
         completeTask(task).catch((e) => toast(e.message || String(e), "error"));
       });
     }
+    if (taskDetail.checklistNoteSaveBtn) {
+      taskDetail.checklistNoteSaveBtn.addEventListener("click", () => {
+        saveTaskChecklistNote({ silent: false }).catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
 
     return taskDetail;
   }
@@ -601,6 +618,9 @@
     const closed = task.status === "done" || task.status === "canceled";
     taskDetail.startBtn.style.display = closed ? "none" : "";
     taskDetail.doneBtn.style.display = closed ? "none" : "";
+    const noteLocked = task.status === "canceled";
+    if (taskDetail.checklistNoteInput) taskDetail.checklistNoteInput.disabled = noteLocked;
+    if (taskDetail.checklistNoteSaveBtn) taskDetail.checklistNoteSaveBtn.disabled = noteLocked;
   }
 
   async function staffStartTask(taskId) {
@@ -613,6 +633,36 @@
     if (error) throw error;
   }
 
+  async function staffSetTaskChecklistNote(taskId, note) {
+    const { error } = await CN.sb.rpc("staff_set_task_checklist_note", {
+      p_task_id: taskId,
+      p_checklist_note: note || null
+    });
+    if (error) throw error;
+  }
+
+  async function saveTaskChecklistNote(options = {}) {
+    const task = taskDetail.currentTask;
+    if (!task || !taskDetail.checklistNoteInput) return "";
+    const note = taskDetail.checklistNoteInput.value.trim();
+    const previous = String(task.checklist_note || "").trim();
+    if (note === previous) {
+      if (!options.silent) toast("Checklist note saved.", "ok");
+      return note;
+    }
+
+    const button = taskDetail.checklistNoteSaveBtn;
+    if (button) button.disabled = true;
+    try {
+      await staffSetTaskChecklistNote(task.id, note);
+      task.checklist_note = note || null;
+      if (!options.silent) toast("Checklist note saved.", "ok");
+      return note;
+    } finally {
+      if (button) button.disabled = task.status === "canceled";
+    }
+  }
+
   async function startTask(item) {
     await staffStartTask(item.id);
     toast("Started.", "ok");
@@ -623,6 +673,15 @@
   }
 
   async function completeTask(item) {
+    await saveTaskChecklistNote({ silent: true });
+    const checklist = await loadTaskChecklistItems(item.id);
+    const remaining = checklist.filter((row) => !row.done).length;
+    if (remaining > 0) {
+      const confirmed = window.confirm(
+        `There are ${remaining} incomplete checklist items. Complete the task anyway? Add a checklist note if the client needs an explanation.`
+      );
+      if (!confirmed) return;
+    }
     await staffCompleteTask(item.id);
     toast("Completed.", "ok");
     await refresh();
@@ -669,6 +728,9 @@
       : await loadTaskDetail(taskOrId.id);
 
     detail.currentTask = task;
+    if (detail.checklistNoteInput) {
+      detail.checklistNoteInput.value = task.checklist_note || "";
+    }
 
     if (detail.title) {
       detail.title.textContent = task.label ? task.label.name : "Task";

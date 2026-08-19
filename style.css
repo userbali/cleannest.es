@@ -3196,6 +3196,25 @@ html[data-theme="canary"] body:not(.portal-page) footer{
   gap: 10px;
 }
 
+.checklist-note-editor{
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--stroke);
+}
+
+.checklist-note-input{
+  width: 100%;
+  min-height: 78px;
+  resize: vertical;
+}
+
+.checklist-note-actions{
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
 .client-checklists{
   margin-top: 10px;
   display:grid;
@@ -3216,6 +3235,22 @@ html[data-theme="canary"] body:not(.portal-page) footer{
   border: 1px dashed var(--stroke);
   border-radius: 12px;
   background: var(--surface2);
+}
+
+.client-checklist-note{
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--brand-blue);
+  border-radius: 6px;
+  background: var(--surface2);
+}
+
+.client-checklist-note__text{
+  margin-top: 4px;
+  color: var(--text);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .client-photo-columns{
@@ -3423,6 +3458,7 @@ html[data-theme="canary"] body:not(.portal-page) footer{
 @media (max-width: 760px){
   .client-checklists{ grid-template-columns: 1fr; }
   .client-photo-columns{ grid-template-columns: 1fr; }
+  .checklist-note-actions .btn{ width: 100%; justify-content: center; }
 }
 
 @media (max-width: 520px){

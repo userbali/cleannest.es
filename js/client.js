@@ -155,41 +155,56 @@
     container.appendChild(box);
   }
 
-  function renderChecklistColumns(container, items) {
+  function renderChecklistColumns(container, items, note) {
     if (!container) return;
     container.innerHTML = "";
     const list = Array.isArray(items) ? items : [];
-    if (!list.length) return;
+    if (list.length) {
+      const checklistItems = list.filter((item) => !isSetupLabel(item.label));
+      const setupItems = list.filter((item) => isSetupLabel(item.label));
 
-    const checklistItems = list.filter((item) => !isSetupLabel(item.label));
-    const setupItems = list.filter((item) => isSetupLabel(item.label));
+      const grid = document.createElement("div");
+      grid.className = "client-checklists";
 
-    const grid = document.createElement("div");
-    grid.className = "client-checklists";
+      const checklistCol = document.createElement("div");
+      checklistCol.className = "client-checklist-col";
+      const checklistLabel = document.createElement("div");
+      checklistLabel.className = "label";
+      checklistLabel.textContent = "Checklist";
+      checklistCol.appendChild(checklistLabel);
+      const checklistBody = document.createElement("div");
+      renderChecklistList(checklistBody, checklistItems, { type: "checklist", setup: false });
+      checklistCol.appendChild(checklistBody);
+      grid.appendChild(checklistCol);
 
-    const checklistCol = document.createElement("div");
-    checklistCol.className = "client-checklist-col";
-    const checklistLabel = document.createElement("div");
-    checklistLabel.className = "label";
-    checklistLabel.textContent = "Checklist";
-    checklistCol.appendChild(checklistLabel);
-    const checklistBody = document.createElement("div");
-    renderChecklistList(checklistBody, checklistItems, { type: "checklist", setup: false });
-    checklistCol.appendChild(checklistBody);
-    grid.appendChild(checklistCol);
+      const setupCol = document.createElement("div");
+      setupCol.className = "client-checklist-col";
+      const setupLabel = document.createElement("div");
+      setupLabel.className = "label";
+      setupLabel.textContent = "Setup";
+      setupCol.appendChild(setupLabel);
+      const setupBody = document.createElement("div");
+      renderChecklistList(setupBody, setupItems, { type: "setup", setup: true });
+      setupCol.appendChild(setupBody);
+      grid.appendChild(setupCol);
 
-    const setupCol = document.createElement("div");
-    setupCol.className = "client-checklist-col";
-    const setupLabel = document.createElement("div");
-    setupLabel.className = "label";
-    setupLabel.textContent = "Setup";
-    setupCol.appendChild(setupLabel);
-    const setupBody = document.createElement("div");
-    renderChecklistList(setupBody, setupItems, { type: "setup", setup: true });
-    setupCol.appendChild(setupBody);
-    grid.appendChild(setupCol);
+      container.appendChild(grid);
+    }
 
-    container.appendChild(grid);
+    const noteText = String(note || "").trim();
+    if (noteText) {
+      const noteBox = document.createElement("div");
+      noteBox.className = "client-checklist-note";
+      const noteLabel = document.createElement("div");
+      noteLabel.className = "label";
+      noteLabel.textContent = "Checklist note";
+      const noteBody = document.createElement("div");
+      noteBody.className = "client-checklist-note__text";
+      noteBody.textContent = noteText;
+      noteBox.appendChild(noteLabel);
+      noteBox.appendChild(noteBody);
+      container.appendChild(noteBox);
+    }
   }
 
   function renderGallery(container, items) {
@@ -283,7 +298,7 @@
     const today = toDateInputValue(new Date());
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, property_id, day_date, status, duration_minutes, start_at, end_at, notes, property:properties(id, address), label:task_labels(name)")
+      .select("id, property_id, day_date, status, duration_minutes, start_at, end_at, notes, checklist_note, property:properties(id, address), label:task_labels(name)")
       .gte("day_date", today)
       .neq("status", "done")
       .neq("status", "canceled")
@@ -295,7 +310,7 @@
   async function loadHistory() {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, property_id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, property:properties(id, address), label:task_labels(name)")
+      .select("id, property_id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, checklist_note, property:properties(id, address), label:task_labels(name)")
       .eq("status", "done")
       .order("completed_at", { ascending: false, nullsFirst: false })
       .order("day_date", { ascending: false })
@@ -379,9 +394,10 @@
 
       if (showChecklist && checklistsByTask) {
         const checklistItems = checklistsByTask.get(task.id) || [];
-        if (checklistItems.length) {
+        const checklistNote = String(task.checklist_note || "").trim();
+        if (checklistItems.length || checklistNote) {
           const checklistWrap = document.createElement("div");
-          renderChecklistColumns(checklistWrap, checklistItems);
+          renderChecklistColumns(checklistWrap, checklistItems, checklistNote);
           card.appendChild(checklistWrap);
         }
       }

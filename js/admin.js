@@ -86,6 +86,8 @@
     meta: null,
     checklist: null,
     checklistHint: null,
+    checklistNoteInput: null,
+    checklistNoteSaveBtn: null,
     setupList: null,
     setupHint: null,
     rescheduleCard: null,
@@ -919,7 +921,7 @@
   async function loadTaskDetail(taskId) {
     const { data, error } = await CN.sb
       .from("tasks")
-      .select("id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, price, add_ons, invoice_id, completion_email_sent_at, assigned_user_id, property_id, label_id, property:properties(address)")
+      .select("id, day_date, status, duration_minutes, start_at, end_at, completed_at, notes, checklist_note, price, add_ons, invoice_id, completion_email_sent_at, assigned_user_id, property_id, label_id, property:properties(address)")
       .eq("id", taskId)
       .single();
     if (error) throw error;
@@ -1254,6 +1256,14 @@
                   <span class="small-note" id="taskChecklistHint"></span>
                 </div>
                 <div class="checklist" id="taskChecklistList"></div>
+                <div class="checklist-note-editor">
+                  <label class="label" for="taskChecklistNote">Checklist note</label>
+                  <textarea class="input checklist-note-input" id="taskChecklistNote" rows="3" maxlength="2000" placeholder="Explain why an item could not be completed."></textarea>
+                  <div class="row checklist-note-actions">
+                    <span class="small-note">Visible to the client.</span>
+                    <button class="btn" id="taskChecklistNoteSave" type="button">Save note</button>
+                  </div>
+                </div>
               </div>
               <div class="card">
                 <div class="row" style="justify-content:space-between; align-items:center;">
@@ -1313,6 +1323,8 @@
       taskDetail.meta = modal.querySelector("#taskDetailMeta");
       taskDetail.checklist = modal.querySelector("#taskChecklistList");
       taskDetail.checklistHint = modal.querySelector("#taskChecklistHint");
+      taskDetail.checklistNoteInput = modal.querySelector("#taskChecklistNote");
+      taskDetail.checklistNoteSaveBtn = modal.querySelector("#taskChecklistNoteSave");
       taskDetail.setupList = modal.querySelector("#taskSetupList");
       taskDetail.setupHint = modal.querySelector("#taskSetupHint");
       taskDetail.refGallery = modal.querySelector("#taskRefGallery");
@@ -1395,6 +1407,11 @@
         const task = taskDetail.currentTask;
         if (!task) return;
         attemptCompleteTask(task).catch((e) => toast(e.message || String(e), "error"));
+      });
+    }
+    if (taskDetail.checklistNoteSaveBtn) {
+      taskDetail.checklistNoteSaveBtn.addEventListener("click", () => {
+        saveTaskChecklistNote({ silent: false }).catch((e) => toast(e.message || String(e), "error"));
       });
     }
     if (taskDetail.emailBtn) {
@@ -1619,6 +1636,12 @@
     taskDetail.doneBtn.disabled = isDone;
     taskDetail.doneBtn.classList.toggle("is-success", isDone);
     taskDetail.doneBtn.textContent = isDone ? "Completed" : "Done";
+    if (taskDetail.checklistNoteInput) {
+      taskDetail.checklistNoteInput.disabled = isCanceled;
+    }
+    if (taskDetail.checklistNoteSaveBtn) {
+      taskDetail.checklistNoteSaveBtn.disabled = isCanceled;
+    }
     if (taskDetail.emailBtn) {
       const sent = Boolean(task.completion_email_sent_at);
       taskDetail.emailBtn.style.display = isDone ? "" : "none";
@@ -1631,6 +1654,28 @@
       taskDetail.invoiceBtn.style.display = isDone ? "" : "none";
       taskDetail.invoiceBtn.classList.toggle("is-success", hasInvoice);
       taskDetail.invoiceBtn.textContent = hasInvoice ? "Open invoice" : "Create invoice";
+    }
+  }
+
+  async function saveTaskChecklistNote(options = {}) {
+    const task = taskDetail.currentTask;
+    if (!task || !taskDetail.checklistNoteInput) return "";
+    const note = taskDetail.checklistNoteInput.value.trim();
+    const previous = String(task.checklist_note || "").trim();
+    if (note === previous) {
+      if (!options.silent) toast("Checklist note saved.", "ok");
+      return note;
+    }
+
+    const button = taskDetail.checklistNoteSaveBtn;
+    if (button) button.disabled = true;
+    try {
+      await updateTask(task.id, { checklist_note: note || null });
+      task.checklist_note = note || null;
+      if (!options.silent) toast("Checklist note saved.", "ok");
+      return note;
+    } finally {
+      if (button) button.disabled = task.status === "canceled";
     }
   }
 
@@ -1690,6 +1735,9 @@
 
     detail.currentTask = task;
     closeTaskRescheduleCard();
+    if (detail.checklistNoteInput) {
+      detail.checklistNoteInput.value = task.checklist_note || "";
+    }
 
     const prop = getPropertyById(task.property_id) || task.property;
     const label = getLabelById(task.label_id);
@@ -1802,22 +1850,29 @@
     await ensureTaskChecklist(task.id, task.property_id);
     const checklist = await loadTaskChecklistItems(task.id);
     const remaining = checklist.filter((item) => !item.done).length;
-    if (remaining) {
-      return { ok: false, reason: `Checklist incomplete (${remaining} items).` };
-    }
     const workMedia = await loadMediaLinks({ taskId: task.id });
-    if (!workMedia.length) {
+    const workCount = workMedia.filter((item) => item && item.tag !== "reference").length;
+    if (!workCount) {
       return { ok: false, reason: "Add at least one work photo before completing." };
     }
-    return { ok: true };
+    return { ok: true, remaining };
   }
 
   async function attemptCompleteTask(task) {
+    await saveTaskChecklistNote({ silent: true });
     const check = await canCompleteTask(task);
     if (!check.ok) {
       toast(check.reason, "error");
       await openTaskDetail(task);
       return false;
+    }
+    if (check.remaining > 0) {
+      const fallback = `There are ${check.remaining} incomplete checklist items. Complete the task anyway? Add a checklist note if the client needs an explanation.`;
+      const message = window.CN_ADMIN_I18N
+        ? window.CN_ADMIN_I18N.t("task.incomplete_confirm", fallback, { count: check.remaining })
+        : fallback;
+      const confirmed = window.confirm(message);
+      if (!confirmed) return false;
     }
     await updateTask(task.id, { status: "done", completed_at: new Date().toISOString() });
     toast("Task completed.", "ok");
