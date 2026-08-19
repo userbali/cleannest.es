@@ -13,6 +13,20 @@ function jsonResponse(payload: Record<string, unknown>, status = 200) {
   });
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function buildClientTaskUrl(publicSiteUrl: string, taskId: string) {
+  const baseUrl = (publicSiteUrl || "https://www.cleannest.es").trim().replace(/\/+$/, "");
+  return `${baseUrl}/client.html?task=${encodeURIComponent(taskId)}`;
+}
+
 function parseAmount(value: unknown) {
   if (value == null) return null;
   const raw = String(value).trim().replace(",", ".");
@@ -71,10 +85,20 @@ function buildInvoiceItems(task: any, property: any) {
   return { items, total };
 }
 
-async function sendCompletionEmail(resendKey: string, from: string, to: string, name: string, address: string, completedAt: string) {
+async function sendCompletionEmail(
+  resendKey: string,
+  from: string,
+  to: string,
+  name: string,
+  address: string,
+  completedAt: string,
+  taskId: string,
+  publicSiteUrl: string
+) {
   const safeName = name || "there";
   const safeAddress = address || "your property";
   const completedDate = completedAt ? completedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const portalUrl = buildClientTaskUrl(publicSiteUrl, taskId);
   const subject = "Cleaning";
   const text = [
     `Hi ${safeName},`,
@@ -82,13 +106,24 @@ async function sendCompletionEmail(resendKey: string, from: string, to: string, 
     `We wanted to let you know that the cleaning at ${safeAddress} was completed on ${completedDate}.`,
     "The completion photos are now available to view in your Clean-Nest portal.",
     "",
+    "View the latest cleaning:",
+    portalUrl,
+    "",
     "Best regards,",
     "Clean-Nest team"
   ].join("\n");
+  const safeHtmlName = escapeHtml(safeName);
+  const safeHtmlAddress = escapeHtml(safeAddress);
+  const safeHtmlDate = escapeHtml(completedDate);
+  const safeHtmlPortalUrl = escapeHtml(portalUrl);
   const html = `
-    <p>Hi ${safeName},</p>
-    <p>We wanted to let you know that the cleaning at <strong>${safeAddress}</strong> was completed on ${completedDate}.</p>
+    <p>Hi ${safeHtmlName},</p>
+    <p>We wanted to let you know that the cleaning at <strong>${safeHtmlAddress}</strong> was completed on ${safeHtmlDate}.</p>
     <p>The completion photos are now available to view in your Clean-Nest portal.</p>
+    <p style="margin:24px 0;">
+      <a href="${safeHtmlPortalUrl}" style="display:inline-block;padding:11px 18px;background:#1478c9;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:700;">View latest cleaning</a>
+    </p>
+    <p style="font-size:13px;color:#5f6b76;">Sign in to your Clean-Nest portal if prompted.</p>
     <p>Best regards,<br/>Clean-Nest team</p>
   `;
   const payload = {
@@ -126,6 +161,7 @@ serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
     const resendKey = Deno.env.get("RESEND_API_KEY") || "";
     const resendFrom = Deno.env.get("RESEND_FROM") || "info@cleannest.es";
+    const publicSiteUrl = Deno.env.get("PUBLIC_SITE_URL") || "https://www.cleannest.es";
 
     if (!supabaseUrl || !serviceRole || !anonKey) {
       return jsonResponse({ error: "Missing Supabase environment." }, 500);
@@ -283,7 +319,9 @@ serve(async (req) => {
         owner.email,
         owner.name || "",
         property.address || "",
-        task.completed_at || new Date().toISOString()
+        task.completed_at || new Date().toISOString(),
+        task.id,
+        publicSiteUrl
       );
       await supabase.from("tasks").update({ completion_email_sent_at: new Date().toISOString() }).eq("id", task.id);
       emailSent = true;

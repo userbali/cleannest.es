@@ -40,7 +40,12 @@
   async function requireSession() {
     const s = await getSession();
     if (!s) {
-      window.location.href = "login.html";
+      const page = window.location.pathname.split("/").pop() || "";
+      const returnTo = `${page}${window.location.search || ""}`;
+      const loginUrl = page && page !== "login.html"
+        ? `login.html?next=${encodeURIComponent(returnTo)}`
+        : "login.html";
+      window.location.href = loginUrl;
       throw new Error("Auth session missing. Please sign in again.");
     }
     return s;

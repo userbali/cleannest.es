@@ -38,6 +38,25 @@
     return `${window.location.origin}${window.location.pathname}`;
   }
 
+  function getSafeNextPath(role) {
+    const raw = String(queryParams.get("next") || "").trim();
+    if (!raw || raw.startsWith("/") || raw.includes("\\") || raw.includes("://")) return "";
+    let parsed;
+    try {
+      parsed = new URL(raw, "https://cleannest.local/");
+    } catch (e) {
+      return "";
+    }
+    const page = parsed.pathname.replace(/^\/+/, "");
+    const allowedPage = role === "admin"
+      ? "admin.html"
+      : role === "staff"
+        ? "staff.html"
+        : "client.html";
+    if (page !== allowedPage) return "";
+    return `${page}${parsed.search}${parsed.hash}`;
+  }
+
   CN.sb.auth.onAuthStateChange((event) => {
     if (event === "PASSWORD_RECOVERY") {
       recoveryMode = true;
@@ -69,9 +88,16 @@
 
   async function redirectByRole() {
     const p = await CN.getProfile();
-    if (p.role === "admin") window.location.href = "admin.html";
-    else if (p.role === "staff") window.location.href = "staff.html";
-    else window.location.href = "client.html";
+    const nextPath = getSafeNextPath(p.role);
+    if (nextPath) {
+      window.location.href = nextPath;
+    } else if (p.role === "admin") {
+      window.location.href = "admin.html";
+    } else if (p.role === "staff") {
+      window.location.href = "staff.html";
+    } else {
+      window.location.href = "client.html";
+    }
   }
 
   // If already logged in, redirect

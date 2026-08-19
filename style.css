@@ -3675,6 +3675,11 @@ html[data-theme="canary"] body:not(.portal-page) footer{
 /* ===== Staff bookings (scoped) ===== */
 .booking-list{display:flex;flex-direction:column;gap:12px;}
 .booking-card{background:var(--surface);border:1px solid var(--stroke);border-radius:var(--radius2);padding:14px;}
+.booking-card.is-target-cleaning{
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 3px rgba(31, 136, 255, .2);
+  scroll-margin-top: 96px;
+}
 .booking-top{display:flex;gap:14px;align-items:flex-start;}
 .booking-when{min-width:120px;}
 .booking-date{font-weight:900;}

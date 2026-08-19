@@ -29,6 +29,11 @@
   const historyWrap = $("clientHistoryWrap");
   const upcomingEl = $("clientUpcoming");
   const historyEl = $("clientHistory");
+  const taskParam = new URLSearchParams(window.location.search).get("task") || "";
+  const targetTaskId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(taskParam)
+    ? taskParam
+    : "";
+  let targetTaskRevealed = false;
 
   function pad2(n) {
     return String(n).padStart(2, "0");
@@ -335,6 +340,12 @@
     tasks.forEach((task) => {
       const card = document.createElement("div");
       card.className = "booking-card";
+      card.dataset.clientTaskId = task.id;
+      if (task.id === targetTaskId) {
+        card.classList.add("is-target-cleaning");
+        card.setAttribute("aria-current", "true");
+        card.tabIndex = -1;
+      }
 
       const top = document.createElement("div");
       top.className = "booking-top";
@@ -416,6 +427,31 @@
     container.appendChild(list);
   }
 
+  function setClientView(view) {
+    const selectedView = view === "history" ? "history" : "upcoming";
+    if (viewToggle) {
+      viewToggle.querySelectorAll("[data-view]").forEach((el) => {
+        el.classList.toggle("is-active", el.getAttribute("data-view") === selectedView);
+      });
+    }
+    if (upcomingWrap && historyWrap) {
+      upcomingWrap.style.display = selectedView === "upcoming" ? "block" : "none";
+      historyWrap.style.display = selectedView === "history" ? "block" : "none";
+    }
+  }
+
+  function revealTargetTask() {
+    if (!targetTaskId || targetTaskRevealed) return;
+    const card = document.querySelector(`[data-client-task-id="${targetTaskId}"]`);
+    if (!card) return;
+    setClientView(card.closest("#clientHistory") ? "history" : "upcoming");
+    targetTaskRevealed = true;
+    requestAnimationFrame(() => {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.focus({ preventScroll: true });
+    });
+  }
+
   async function refresh() {
     try {
       const [upcoming, history] = await Promise.all([loadUpcoming(), loadHistory()]);
@@ -432,6 +468,7 @@
       ]);
       renderList(upcomingEl, upcoming, "No upcoming cleanings.", { photosByTask, showPhotos: true, checklistsByTask, showChecklist: true });
       renderList(historyEl, history, "No history yet.", { photosByTask, showPhotos: true, checklistsByTask, showChecklist: true, useCompletedAt: true });
+      revealTargetTask();
     } catch (e) {
       toast(e.message || String(e), "error");
     }
@@ -441,13 +478,7 @@
     viewToggle.querySelectorAll("[data-view]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const view = btn.getAttribute("data-view");
-        viewToggle.querySelectorAll("[data-view]").forEach((el) => {
-          el.classList.toggle("is-active", el.getAttribute("data-view") === view);
-        });
-        if (upcomingWrap && historyWrap) {
-          upcomingWrap.style.display = view === "upcoming" ? "block" : "none";
-          historyWrap.style.display = view === "history" ? "block" : "none";
-        }
+        setClientView(view);
       });
     });
   }
