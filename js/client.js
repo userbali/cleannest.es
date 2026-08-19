@@ -195,7 +195,8 @@
   function renderGallery(container, items) {
     if (!container) return;
     container.innerHTML = "";
-    const list = Array.isArray(items) ? items : [];
+    const list = (Array.isArray(items) ? items : [])
+      .filter((item) => item && item.tag !== "reference");
     if (!list.length) {
       container.innerHTML = '<div class="small-note">No photos yet.</div>';
       return;
@@ -205,7 +206,7 @@
       shot.className = "shot";
       const img = document.createElement("img");
       img.src = item.signedUrl || "";
-      img.alt = item.tag === "reference" ? "Reference photo" : "Work photo";
+      img.alt = "Work photo";
       img.setAttribute("data-action", "open-photo");
       if (item.signedUrl) img.setAttribute("data-src", item.signedUrl);
       img.setAttribute("data-date", fmtPhotoDate(item.media && item.media.created_at) || "");
@@ -228,38 +229,17 @@
       return shot;
     }
 
-    function buildPhotoColumn(title, photos, emptyMessage) {
-      const col = document.createElement("div");
-      col.className = "client-photo-col";
-      const colLabel = document.createElement("div");
-      colLabel.className = "label";
-      colLabel.textContent = title;
-      col.appendChild(colLabel);
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = "Work photos";
+    container.appendChild(label);
 
-      if (!photos.length) {
-        const empty = document.createElement("div");
-        empty.className = "small-note";
-        empty.textContent = emptyMessage;
-        col.appendChild(empty);
-        return col;
-      }
-
-      const gallery = document.createElement("div");
-      gallery.className = "gallery";
-      photos.forEach((item) => {
-        gallery.appendChild(buildPhotoCard(item));
-      });
-      col.appendChild(gallery);
-      return col;
-    }
-
-    const referencePhotos = list.filter((item) => item.tag === "reference");
-    const uploadedPhotos = list.filter((item) => item.tag !== "reference");
-    const columns = document.createElement("div");
-    columns.className = "client-photo-columns";
-    columns.appendChild(buildPhotoColumn("Reference photos", referencePhotos, "No reference photos yet."));
-    columns.appendChild(buildPhotoColumn("Uploaded photos", uploadedPhotos, "No uploaded photos yet."));
-    container.appendChild(columns);
+    const gallery = document.createElement("div");
+    gallery.className = "gallery";
+    list.forEach((item) => {
+      gallery.appendChild(buildPhotoCard(item));
+    });
+    container.appendChild(gallery);
   }
 
   async function loadTaskWorkPhotos(taskIds) {
@@ -295,48 +275,6 @@
     (data || []).forEach((row) => {
       if (!map.has(row.task_id)) map.set(row.task_id, []);
       map.get(row.task_id).push(row);
-    });
-    return map;
-  }
-
-  async function loadTaskReferencePhotos(taskIds) {
-    const ids = Array.isArray(taskIds) ? taskIds.filter(Boolean) : [];
-    if (!ids.length) return new Map();
-    const { data, error } = await CN.sb
-      .from("media_links")
-      .select("id, task_id, tag, created_at, media:media(id, path, mime_type, created_at)")
-      .in("task_id", ids)
-      .eq("tag", "reference")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    const withUrls = await attachSignedUrls(data || []);
-    const map = new Map();
-    withUrls.forEach((item) => {
-      const taskId = item && item.task_id ? String(item.task_id) : "";
-      if (!taskId) return;
-      if (!map.has(taskId)) map.set(taskId, []);
-      map.get(taskId).push(item);
-    });
-    return map;
-  }
-
-  async function loadPropertyReferencePhotos(propertyIds) {
-    const ids = Array.isArray(propertyIds) ? propertyIds.filter(Boolean) : [];
-    if (!ids.length) return new Map();
-    const { data, error } = await CN.sb
-      .from("media_links")
-      .select("id, property_id, tag, created_at, media:media(id, path, mime_type, created_at)")
-      .in("property_id", ids)
-      .eq("tag", "reference")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    const withUrls = await attachSignedUrls(data || []);
-    const map = new Map();
-    withUrls.forEach((item) => {
-      const propertyId = item && item.property_id ? String(item.property_id) : "";
-      if (!propertyId) return;
-      if (!map.has(propertyId)) map.set(propertyId, []);
-      map.get(propertyId).push(item);
     });
     return map;
   }
@@ -466,44 +404,16 @@
     try {
       const [upcoming, history] = await Promise.all([loadUpcoming(), loadHistory()]);
       const taskPhotoIds = new Set();
-      const propertyPhotoIds = new Set();
       const checklistIds = new Set();
       const allTasks = [...upcoming, ...history];
       allTasks.forEach((task) => {
         if (task && task.id) taskPhotoIds.add(task.id);
-        const propertyId = task && task.property_id
-          ? String(task.property_id)
-          : (task && task.property && task.property.id ? String(task.property.id) : "");
-        if (propertyId) propertyPhotoIds.add(propertyId);
         checklistIds.add(task.id);
       });
-      const [taskPhotosByTask, referencePhotosByProperty, referencePhotosByTask] = await Promise.all([
+      const [photosByTask, checklistsByTask] = await Promise.all([
         loadTaskWorkPhotos(Array.from(taskPhotoIds)),
-        loadPropertyReferencePhotos(Array.from(propertyPhotoIds)),
-        loadTaskReferencePhotos(Array.from(taskPhotoIds))
+        loadChecklists(Array.from(checklistIds))
       ]);
-      const photosByTask = new Map();
-      allTasks.forEach((task) => {
-        if (!task || !task.id) return;
-        const propertyId = task.property_id
-          ? String(task.property_id)
-          : (task.property && task.property.id ? String(task.property.id) : "");
-        const refById = new Map();
-        const propertyRefs = propertyId ? (referencePhotosByProperty.get(propertyId) || []) : [];
-        propertyRefs.forEach((item) => {
-          if (!item || !item.id) return;
-          refById.set(item.id, item);
-        });
-        const taskRefs = referencePhotosByTask.get(task.id) || [];
-        taskRefs.forEach((item) => {
-          if (!item || !item.id) return;
-          refById.set(item.id, item);
-        });
-        const refs = Array.from(refById.values());
-        const work = taskPhotosByTask.get(task.id) || [];
-        photosByTask.set(task.id, [...refs, ...work]);
-      });
-      const checklistsByTask = await loadChecklists(Array.from(checklistIds));
       renderList(upcomingEl, upcoming, "No upcoming cleanings.", { photosByTask, showPhotos: true, checklistsByTask, showChecklist: true });
       renderList(historyEl, history, "No history yet.", { photosByTask, showPhotos: true, checklistsByTask, showChecklist: true, useCompletedAt: true });
     } catch (e) {

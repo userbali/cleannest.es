@@ -7,7 +7,7 @@
 <title>Clean-Nest • Admin</title>
 <meta content="Clean-Nest customer portal" name="description"/>
 <link href="pics/logo.png" rel="icon" type="image/png"/>
-<link href="style.css?v=20260216-done-green" rel="stylesheet"/>
+<link href="style.css?v=20260819-canary-full" rel="stylesheet"/>
 </head>
 <body class="portal-page">
 <header class="header">
@@ -28,6 +28,7 @@
 <button aria-checked="false" class="theme-opt" data-theme-set="system" role="menuitemradio" type="button">System</button>
 <button aria-checked="false" class="theme-opt" data-theme-set="light" role="menuitemradio" type="button">Light</button>
 <button aria-checked="false" class="theme-opt" data-theme-set="dark" role="menuitemradio" type="button">Dark</button>
+<button aria-checked="false" class="theme-opt" data-theme-set="canary" role="menuitemradio" type="button">Canary Islands</button>
 </div>
 </div>
 <div aria-label="Language" class="lang-switch" id="adminLangSwitch">
@@ -134,7 +135,7 @@
 <div class="label">Owner &amp; property</div>
 <div class="row-2">
 <select class="input" id="timelineAddOwner">
-<option value="">All owners</option>
+<option value="">Select owner</option>
 </select>
 <select class="input" id="timelineAddProperty">
 <option value="">Select property</option>
@@ -144,7 +145,8 @@
 </div>
 <div class="row-2" style="margin-top:12px;">
 <select class="input" id="timelineAddActivityType">
-<option value="">Booking (default)</option>
+<option disabled="" selected="" value="__select_activity__">Select activity</option>
+<option value="">Cleaning</option>
 </select>
 <select class="input" id="timelineAddStaff">
 <option value="">Staff</option>
@@ -781,5 +783,5 @@
 
 
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin-i18n.js?v=20260225-admin-hu"></script><script src="js/admin.js?v=20260225-admin-hu"></script></body>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="js/theme.js?v=20260819-canary-full"></script><script src="js/app-core.js"></script><script src="js/ui.js"></script><script src="lightbox.js"></script><script src="js/admin-i18n.js?v=20260819-timeline-form"></script><script src="js/admin.js?v=20260819-timeline-form"></script></body>
 </html>

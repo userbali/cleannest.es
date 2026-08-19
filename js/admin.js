@@ -20,6 +20,7 @@
   ];
 
   const STATUS_SCHEDULED = ["planned", "assigned", "offered"];
+  const TIMELINE_ACTIVITY_PLACEHOLDER = "__select_activity__";
 
     const state = {
     clients: [],
@@ -4208,6 +4209,7 @@
     if (!els.timelineHeatmap) return;
     const monthStart = startOfMonth(focusDate);
     const monthEnd = endOfMonth(focusDate);
+    const todayKey = toDateInputValue(new Date());
     const startOffset = monthStart.getDay();
     const gridStart = addDays(monthStart, -startOffset);
     const monthTasksByDay = groupBy(monthTasks, (t) => t.day_date);
@@ -4260,6 +4262,11 @@
       const cell = document.createElement("div");
       cell.className = `hm-day hm-lvl-${level}`;
       if (day < monthStart || day > monthEnd) cell.classList.add("is-out");
+      if (key === todayKey) {
+        cell.classList.add("is-today");
+        cell.setAttribute("aria-current", "date");
+        cell.title = "Today";
+      }
       cell.dataset.date = key;
       cell.innerHTML = `<div class="hm-day__num">${day.getDate()}</div><div class="hm-day__cnt">${state.timeline.metric === "hours" ? val.toFixed(1) + "h" : val + " jobs"}</div>`;
       if (!(day < monthStart || day > monthEnd)) {
@@ -4288,7 +4295,7 @@
     els.timelineAddOwner.innerHTML = "";
     const allOpt = document.createElement("option");
     allOpt.value = "";
-    allOpt.textContent = "All owners";
+    allOpt.textContent = "Select owner";
     els.timelineAddOwner.appendChild(allOpt);
     owners.forEach((owner) => {
       const opt = document.createElement("option");
@@ -4301,11 +4308,16 @@
 
   function populateTimelineActivityTypeSelect() {
     if (!els.timelineAddActivityType) return;
-    const current = els.timelineAddActivityType.value || "";
+    const current = els.timelineAddActivityType.value || TIMELINE_ACTIVITY_PLACEHOLDER;
     els.timelineAddActivityType.innerHTML = "";
+    const placeholderOpt = document.createElement("option");
+    placeholderOpt.value = TIMELINE_ACTIVITY_PLACEHOLDER;
+    placeholderOpt.textContent = "Select activity";
+    placeholderOpt.disabled = true;
+    els.timelineAddActivityType.appendChild(placeholderOpt);
     const bookingOpt = document.createElement("option");
     bookingOpt.value = "";
-    bookingOpt.textContent = "Booking (default)";
+    bookingOpt.textContent = "Cleaning";
     els.timelineAddActivityType.appendChild(bookingOpt);
     state.activityTypes.forEach((type) => {
       const opt = document.createElement("option");
@@ -4338,15 +4350,20 @@
   }
 
   function updateTimelineAddMode() {
-    const activityTypeId = els.timelineAddActivityType ? els.timelineAddActivityType.value : "";
+    const selectedActivity = els.timelineAddActivityType ? els.timelineAddActivityType.value : TIMELINE_ACTIVITY_PLACEHOLDER;
+    const isPlaceholder = selectedActivity === TIMELINE_ACTIVITY_PLACEHOLDER;
+    const activityTypeId = isPlaceholder ? "" : selectedActivity;
     const isActivity = Boolean(activityTypeId);
+    if (els.timelineAddSave) els.timelineAddSave.disabled = isPlaceholder;
     if (els.timelineAddStaff) {
       if (!state.timeline.staffTouched) {
         els.timelineAddStaff.value = isActivity ? userId : "";
       }
     }
     if (els.timelineAddHint) {
-      if (isActivity) {
+      if (isPlaceholder) {
+        els.timelineAddHint.textContent = "Select activity";
+      } else if (isActivity) {
         const type = state.activityTypes.find((t) => t.id === activityTypeId);
         els.timelineAddHint.textContent = `Activity: ${type ? type.name : "Activity"}`;
       } else {
@@ -4390,7 +4407,7 @@
       els.timelineAddProperty.value = preselectedPropertyId;
       state.timeline.selectedPropertyId = preselectedPropertyId;
     }
-    if (els.timelineAddActivityType) els.timelineAddActivityType.value = "";
+    if (els.timelineAddActivityType) els.timelineAddActivityType.value = TIMELINE_ACTIVITY_PLACEHOLDER;
     updateTimelineAddMode();
     els.timelineAddModal.removeAttribute("hidden");
   }
@@ -4433,7 +4450,12 @@
 
   async function saveTimelineBooking() {
     const day = state.timeline.selectedDate;
-    const activityTypeId = els.timelineAddActivityType ? els.timelineAddActivityType.value : "";
+    const selectedActivity = els.timelineAddActivityType ? els.timelineAddActivityType.value : TIMELINE_ACTIVITY_PLACEHOLDER;
+    if (selectedActivity === TIMELINE_ACTIVITY_PLACEHOLDER) {
+      toast("Select an activity.", "error");
+      return;
+    }
+    const activityTypeId = selectedActivity;
     const isActivity = Boolean(activityTypeId);
       const propertyId = els.timelineAddProperty ? (els.timelineAddProperty.value || null) : state.timeline.selectedPropertyId;
       if (!day) {

@@ -1,7 +1,13 @@
 /* global document, window */
 (function () {
   var THEME_KEY = "cleannest:theme";
-  var THEMES = { system: true, light: true, dark: true };
+  var THEMES = { system: true, light: true, dark: true, canary: true };
+  var THEME_LABELS = {
+    system: "System",
+    light: "Light",
+    dark: "Dark",
+    canary: "Canary Islands"
+  };
 
   function safeGet(key) {
     try { return window.localStorage.getItem(key); } catch (e) { return null; }
@@ -47,7 +53,7 @@
       var pref = getThemePref();
       instances.forEach(function (inst) {
         var btn = inst.querySelector("[data-theme-button]");
-        if (btn) btn.textContent = "Theme: " + pref.charAt(0).toUpperCase() + pref.slice(1);
+        if (btn) btn.textContent = "Theme: " + (THEME_LABELS[pref] || THEME_LABELS.system);
         var opts = inst.querySelectorAll("[data-theme-set]");
         Array.prototype.forEach.call(opts, function (opt) {
           var val = opt.getAttribute("data-theme-set") || "system";
