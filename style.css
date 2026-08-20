@@ -4027,3 +4027,251 @@ html[data-theme="canary"] body:not(.portal-page) footer{
     font-size: 18px;
   }
 }
+
+/* Full Canary Islands treatment for login and authenticated portals */
+html[data-theme="canary"] body.portal-page{
+  --portal-canary-blue:#0768A9;
+  --portal-canary-blue-soft:#DDF2FC;
+  --portal-canary-yellow:#FFCC00;
+  --portal-canary-yellow-soft:#FFF4B5;
+  --portal-canary-ink:#102C3B;
+  background:
+    linear-gradient(135deg,
+      #FFFFFF 0%,
+      #F8FCFE 22%,
+      #E3F3FB 58%,
+      #FFF3AE 100%);
+  background-attachment:fixed;
+}
+
+html[data-theme="canary"] body.portal-page::before{
+  background:
+    radial-gradient(900px 620px at 4% 2%, rgba(255,255,255,.96), transparent 66%),
+    radial-gradient(1050px 720px at 58% 18%, rgba(7,104,169,.15), transparent 70%),
+    radial-gradient(900px 680px at 96% 90%, rgba(255,204,0,.24), transparent 72%);
+}
+
+html[data-theme="canary"] body.portal-page .header{
+  background:rgba(255,255,255,.90);
+  border-bottom:3px solid var(--portal-canary-yellow);
+  box-shadow:0 10px 30px rgba(7,72,112,.14);
+}
+
+html[data-theme="canary"] body.portal-page .header::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto;
+  height:5px;
+  pointer-events:none;
+  background:linear-gradient(90deg,
+    #FFFFFF 0 33.333%,
+    var(--portal-canary-blue) 33.333% 66.666%,
+    var(--portal-canary-yellow) 66.666% 100%);
+}
+
+html[data-theme="canary"] body.portal-page .header-inner{
+  position:relative;
+  padding-top:18px;
+}
+
+html[data-theme="canary"] body.portal-page .logo{
+  background:#FFFFFF;
+  border:1px solid rgba(7,104,169,.18);
+  box-shadow:0 8px 20px rgba(7,72,112,.12), 0 0 0 3px rgba(255,204,0,.18);
+}
+
+html[data-theme="canary"] body.portal-page .brand-title strong,
+html[data-theme="canary"] body.portal-page .section-title{
+  color:var(--portal-canary-blue);
+}
+
+html[data-theme="canary"] body.portal-page .brand-title span{
+  color:#796300;
+}
+
+html[data-theme="canary"] body.portal-page .theme-menu{
+  border-color:rgba(7,104,169,.28);
+  box-shadow:0 18px 42px rgba(7,72,112,.18);
+}
+
+html[data-theme="canary"] body.portal-page .theme-opt:hover,
+html[data-theme="canary"] body.portal-page .theme-opt[aria-checked="true"]{
+  background:var(--portal-canary-yellow-soft);
+}
+
+html[data-theme="canary"] body.portal-page .lang-switch{
+  background:rgba(255,244,181,.88);
+  border-color:rgba(202,157,0,.34);
+}
+
+html[data-theme="canary"] body.portal-page .lang-btn{
+  color:var(--portal-canary-ink);
+}
+
+html[data-theme="canary"] body.portal-page .lang-btn.is-active{
+  background:var(--portal-canary-blue);
+  border-color:var(--portal-canary-blue);
+  color:#FFFFFF;
+}
+
+html[data-theme="canary"] body.portal-page .btn:not(.btn-danger):not(.btn-primary):not(.is-success){
+  background:rgba(255,255,255,.92);
+  border-color:rgba(7,104,169,.30);
+  color:var(--portal-canary-blue);
+  box-shadow:0 8px 18px rgba(7,72,112,.09);
+}
+
+html[data-theme="canary"] body.portal-page .btn:not(.btn-danger):not(.btn-primary):not(.is-success):hover{
+  background:var(--portal-canary-blue-soft);
+  border-color:rgba(7,104,169,.48);
+}
+
+html[data-theme="canary"] body.portal-page .btn-primary:not(.is-success){
+  background:var(--portal-canary-yellow);
+  border-color:#D5A900;
+  color:var(--portal-canary-ink);
+  box-shadow:0 12px 28px rgba(202,157,0,.24);
+}
+
+html[data-theme="canary"] body.portal-page .btn-primary:not(.is-success):hover{
+  background:#FFDA3E;
+  border-color:#B99200;
+}
+
+html[data-theme="canary"] body.portal-page .input{
+  background:rgba(255,255,255,.92);
+  border-color:rgba(7,104,169,.28);
+  color:var(--portal-canary-ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.80);
+}
+
+html[data-theme="canary"] body.portal-page .input::placeholder{
+  color:#6C8390;
+}
+
+html[data-theme="canary"] body.portal-page .input:focus{
+  border-color:var(--portal-canary-blue);
+  box-shadow:
+    0 0 0 3px rgba(7,104,169,.14),
+    0 0 0 5px rgba(255,204,0,.16);
+}
+
+html[data-theme="canary"] body.portal-page .tag{
+  background:var(--portal-canary-yellow-soft);
+  border-color:rgba(202,157,0,.30);
+  color:var(--portal-canary-ink);
+}
+
+html[data-theme="canary"] body.portal-page #roleTag{
+  background:var(--portal-canary-blue);
+  border-color:var(--portal-canary-blue);
+  color:#FFFFFF;
+}
+
+html[data-theme="canary"] body.portal-page main .card,
+html[data-theme="canary"] body.portal-page .property-card,
+html[data-theme="canary"] body.portal-page .client-card,
+html[data-theme="canary"] body.portal-page .booking-card,
+html[data-theme="canary"] body.portal-page .timeline-day,
+html[data-theme="canary"] body.portal-page .session-card,
+html[data-theme="canary"] body.portal-page .cx-client,
+html[data-theme="canary"] body.portal-page .cx-preview,
+html[data-theme="canary"] body.portal-page .hz-timeline,
+html[data-theme="canary"] body.portal-page .table-wrap{
+  background:rgba(255,255,255,.88);
+  border-color:rgba(7,104,169,.18);
+  box-shadow:0 14px 34px rgba(7,72,112,.10);
+}
+
+html[data-theme="canary"] body.portal-page main .card{
+  box-shadow:
+    inset 0 3px 0 var(--portal-canary-yellow),
+    0 14px 34px rgba(7,72,112,.10);
+}
+
+html[data-theme="canary"] body.portal-page .property-card,
+html[data-theme="canary"] body.portal-page .booking-card,
+html[data-theme="canary"] body.portal-page .timeline-day{
+  border-left:4px solid var(--portal-canary-blue);
+}
+
+html[data-theme="canary"] body.portal-page .admin-props-toolbar,
+html[data-theme="canary"] body.portal-page .admin-controls,
+html[data-theme="canary"] body.portal-page .schedule-controls,
+html[data-theme="canary"] body.portal-page .invoice-controls,
+html[data-theme="canary"] body.portal-page .timeline-heatmap{
+  background:linear-gradient(110deg,
+    rgba(255,255,255,.94),
+    rgba(221,242,252,.88) 72%,
+    rgba(255,244,181,.76));
+  border-color:rgba(7,104,169,.20);
+  box-shadow:0 10px 26px rgba(7,72,112,.08);
+}
+
+html[data-theme="canary"] body.portal-page .tab-btn{
+  background:rgba(255,255,255,.90);
+  border-color:rgba(7,104,169,.26);
+  color:var(--portal-canary-blue);
+}
+
+html[data-theme="canary"] body.portal-page .tab-btn:hover{
+  background:var(--portal-canary-blue-soft);
+}
+
+html[data-theme="canary"] body.portal-page .tab-btn.is-active{
+  background:var(--portal-canary-blue);
+  border-color:var(--portal-canary-blue);
+  color:#FFFFFF;
+  box-shadow:inset 0 -4px 0 var(--portal-canary-yellow), 0 9px 20px rgba(7,72,112,.18);
+}
+
+html[data-theme="canary"] body.portal-page .seg-toggle{
+  background:rgba(255,255,255,.86);
+  border-color:rgba(7,104,169,.24);
+}
+
+html[data-theme="canary"] body.portal-page .seg-btn.is-active{
+  background:var(--portal-canary-yellow);
+  color:var(--portal-canary-ink);
+}
+
+html[data-theme="canary"] body.portal-page .data-table th{
+  background:var(--portal-canary-yellow-soft);
+  color:#5F520D;
+}
+
+html[data-theme="canary"] body.portal-page .data-table tbody tr:hover td{
+  background:rgba(221,242,252,.46);
+}
+
+html[data-theme="canary"] body.portal-page .timeline-day__head,
+html[data-theme="canary"] body.portal-page .hz-hours{
+  background:linear-gradient(90deg, rgba(221,242,252,.72), rgba(255,244,181,.58));
+}
+
+html[data-theme="canary"] body.portal-page .drawer__panel,
+html[data-theme="canary"] body.portal-page .cn-modal__panel,
+html[data-theme="canary"] body.portal-page .lightbox__panel{
+  border:2px solid rgba(7,104,169,.25);
+  border-top:5px solid var(--portal-canary-yellow);
+  box-shadow:0 22px 70px rgba(7,42,64,.28);
+}
+
+html[data-theme="canary"] body.portal-page .empty-state,
+html[data-theme="canary"] body.portal-page .booking-notes,
+html[data-theme="canary"] body.portal-page .client-checklist-note,
+html[data-theme="canary"] body.portal-page .client-checklist-col .small-note,
+html[data-theme="canary"] body.portal-page .client-photo-col .small-note{
+  background:rgba(255,244,181,.54);
+  border-color:rgba(202,157,0,.28);
+}
+
+@media (max-width:720px){
+  html[data-theme="canary"] body.portal-page{
+    background:linear-gradient(155deg, #FFFFFF 0%, #E5F4FB 62%, #FFF3AE 100%);
+  }
+
+  html[data-theme="canary"] body.portal-page .header-inner{
+    padding-top:16px;
+  }
+}
