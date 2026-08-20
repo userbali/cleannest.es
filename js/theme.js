@@ -18,22 +18,26 @@
   }
 
   function getThemePref() {
-    var v = String(safeGet(THEME_KEY) || "system");
+    var saved = safeGet(THEME_KEY);
+    if (saved && THEMES[saved]) return saved;
+    var root = document.documentElement;
+    var pageDefault = root.getAttribute("data-default-theme") || "system";
+    var v = String(pageDefault);
     return THEMES[v] ? v : "system";
   }
 
-  function applyTheme(mode) {
+  function applyTheme(mode, persist) {
     mode = String(mode || "system");
     if (!THEMES[mode]) mode = "system";
     var root = document.documentElement;
     if (mode === "system") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", mode);
     root.setAttribute("data-theme-pref", mode);
-    safeSet(THEME_KEY, mode);
+    if (persist !== false) safeSet(THEME_KEY, mode);
   }
 
   function initTheme() {
-    applyTheme(getThemePref());
+    applyTheme(getThemePref(), false);
   }
 
   function setupThemeUI() {
