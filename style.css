@@ -1931,15 +1931,15 @@ html[data-theme="canary"] body:not(.portal-page) footer{
 .hm-lvl-4{ background: rgba(51, 194, 107, 0.34); }
 
 .hm-day.is-today{
-  border-color: var(--brand-blue);
+  border-color: #D71932;
   border-width: 2px;
-  background-image: linear-gradient(135deg, rgba(31,136,255,.20), transparent 62%);
+  background-image: linear-gradient(135deg, rgba(215,25,50,.18), transparent 62%);
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--brand-blue) 28%, transparent),
+    0 0 0 3px rgba(215,25,50,.28),
     0 8px 18px rgba(11,27,43,.14);
 }
 .hm-day.is-today .hm-day__num{
-  color:var(--brand-blue);
+  color:#B90F25;
   font-size:14px;
 }
 
