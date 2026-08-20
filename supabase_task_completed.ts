@@ -6,6 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
 
+const businessTimeZone = Deno.env.get("APP_TIME_ZONE") || "Atlantic/Canary";
+
+function formatBusinessDate(value?: string | Date | null) {
+  const date = value instanceof Date ? value : new Date(value || Date.now());
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const parts: Record<string, string> = {};
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: businessTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(safeDate).forEach((part) => {
+    if (part.type !== "literal") parts[part.type] = part.value;
+  });
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 function jsonResponse(payload: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -97,7 +114,7 @@ async function sendCompletionEmail(
 ) {
   const safeName = name || "there";
   const safeAddress = address || "your property";
-  const completedDate = completedAt ? completedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const completedDate = formatBusinessDate(completedAt);
   const portalUrl = buildClientTaskUrl(publicSiteUrl, taskId);
   const subject = "Cleaning";
   const text = [
@@ -242,7 +259,9 @@ serve(async (req) => {
       }
 
       const completedAt = task.completed_at || new Date().toISOString();
-      const issueDate = (completedAt || task.day_date || new Date().toISOString()).slice(0, 10);
+      const issueDate = task.completed_at
+        ? formatBusinessDate(task.completed_at)
+        : (task.day_date || formatBusinessDate());
       if (!manualInvoiceNumber) {
         return jsonResponse({ error: "invoice_number is required for manual invoice numbering." }, 400);
       }

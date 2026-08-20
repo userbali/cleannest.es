@@ -2,6 +2,7 @@
 
 (async function () {
   const { $, toast } = CN_UI;
+  const TIME = CN.time;
   let profile;
   let tenantId;
   let userId;
@@ -331,6 +332,10 @@
     return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
   }
 
+  function businessToday() {
+    return TIME.calendarDate(new Date());
+  }
+
   function toTimeInputValue(value) {
     if (value == null || value === "") return "";
     const numeric = typeof value === "number"
@@ -344,7 +349,7 @@
     }
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return TIME.timeKey(date);
   }
 
   function toMonthInputValue(date) {
@@ -450,7 +455,10 @@
   }
 
   function syncMonthFiltersToDate(dateLike, { includeActivities = false } = {}) {
-    const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+    const raw = String(dateLike || "");
+    const date = dateLike instanceof Date
+      ? dateLike
+      : (/^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T12:00:00`) : new Date(dateLike));
     if (Number.isNaN(date.getTime())) return;
     const monthValue = toMonthInputValue(date);
     state.timeline.month = monthValue;
@@ -521,11 +529,7 @@
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false
-    });
+    return TIME.formatTime(d);
   }
 
   function fmtTimeRange(startAt, endAt, durationMinutes) {
@@ -533,9 +537,7 @@
     const startLabel = fmtTime(startAt);
     if (endAt) return `${startLabel} - ${fmtTime(endAt)}`;
     if (durationMinutes) {
-      const d = new Date(startAt);
-      d.setMinutes(d.getMinutes() + Number(durationMinutes || 0));
-      return `${startLabel} - ${fmtTime(d.toISOString())}`;
+      return `${startLabel} - ${fmtTime(TIME.addWallMinutesFromInstantIso(startAt, durationMinutes))}`;
     }
     return startLabel;
   }
@@ -548,18 +550,15 @@
     if (!ts) return null;
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return null;
-    return d.getHours() * 60 + d.getMinutes();
+    const parts = TIME.parts(d);
+    return parts ? parts.hour * 60 + parts.minute : null;
   }
 
   function fmtDateTime(ts) {
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return `${toDateInputValue(d)} ${d.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false
-    })}`;
+    return TIME.dateTimeKey(d);
   }
 
   function parseAmount(value) {
@@ -700,7 +699,7 @@
 
     ctx.drawImage(img, 0, 0, width, height);
 
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = TIME.todayKey();
     const watermarkText = `REFERENCE | ${stamp}`;
     const fontSize = Math.max(18, Math.round(Math.min(width, height) / 20));
 
@@ -757,7 +756,7 @@
 
     ctx.drawImage(img, 0, 0, width, height);
 
-    const stamp = new Date().toISOString().replace("T", " ").slice(0, 16);
+    const stamp = TIME.dateTimeKey(new Date());
     const text = `WORK ${stamp}`;
     const fontSize = Math.max(14, Math.round(Math.min(width, height) / 24));
     const padX = Math.round(fontSize * 0.8);
@@ -964,7 +963,7 @@
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("en-US", {
+    return TIME.formatDate(d, "en-US", {
       year: "numeric",
       month: "short",
       day: "numeric"
@@ -1456,7 +1455,7 @@
       taskDetail.rescheduleBtn.addEventListener("click", () => {
         const task = taskDetail.currentTask;
         if (!task) return;
-        const day = task.day_date || (task.start_at ? toDateInputValue(new Date(task.start_at)) : toDateInputValue(new Date()));
+        const day = task.day_date || (task.start_at ? TIME.dateKey(task.start_at) : TIME.todayKey());
         if (taskDetail.rescheduleDate) taskDetail.rescheduleDate.value = day;
         const duration = getTaskDurationMinutes(task);
         ensureDurationOption(taskDetail.rescheduleDuration, duration);
@@ -1507,13 +1506,12 @@
           patch.start_at = null;
           patch.end_at = null;
         } else {
-          const start = new Date(`${day}T${time}:00`);
-          patch.start_at = start.toISOString();
-          if (duration) {
-            const end = new Date(start.getTime() + duration * 60000);
-            patch.end_at = end.toISOString();
-          } else {
-            patch.end_at = null;
+          try {
+            patch.start_at = TIME.toIso(day, time);
+            patch.end_at = duration ? TIME.addWallMinutesIso(day, time, duration) : null;
+          } catch (e) {
+            toast(e.message || String(e), "error");
+            return;
           }
         }
         updateTask(task.id, patch)
@@ -2286,7 +2284,7 @@
     const staleMs = 14 * 24 * 60 * 60 * 1000;
     state.properties.forEach((prop) => {
       const lastStr = lastDone.get(prop.id);
-      const lastDate = lastStr ? new Date(lastStr + "T00:00:00") : null;
+      const lastDate = lastStr ? TIME.fromWallTime(lastStr, "00:00") : null;
       const noStaff = (staffCount.get(prop.id) || 0) === 0;
       const stale = !lastDate || (now - lastDate) > staleMs;
       if (active.has(prop.id) || noStaff || stale) {
@@ -3281,7 +3279,7 @@
 
     if (els.timelineJumpToday) {
       els.timelineJumpToday.addEventListener("click", () => {
-        const today = new Date();
+        const today = businessToday();
         const monthValue = toMonthInputValue(today);
         if (els.timelineMonth) {
           els.timelineMonth.value = monthValue;
@@ -3347,7 +3345,7 @@
         }
         if (els.plannerJumpToday) {
           els.plannerJumpToday.addEventListener("click", () => {
-            const today = new Date();
+            const today = businessToday();
             const monthValue = toMonthInputValue(today);
             if (els.plannerMonth) {
               els.plannerMonth.value = monthValue;
@@ -3505,7 +3503,7 @@
 
   async function refreshTimeline() {
     if (!els.timelineDays) return;
-    const today = new Date();
+    const today = businessToday();
     const selectedMonth = state.timeline.month || (els.timelineMonth ? els.timelineMonth.value : "");
     const monthDate = fromMonthInputValue(selectedMonth) || today;
     const monthStart = startOfMonth(monthDate);
@@ -3537,7 +3535,7 @@
 
   async function refreshPlannerTimeline() {
     if (!els.plannerGrid) return;
-    const today = new Date();
+    const today = businessToday();
     const selectedMonth = state.planner.month || (els.plannerMonth ? els.plannerMonth.value : "");
     const monthDate = fromMonthInputValue(selectedMonth) || today;
       const monthStart = startOfMonth(monthDate);
@@ -3553,7 +3551,7 @@
       const rangeEnd = addDays(monthEnd, PLANNER_RANGE_BUFFER_DAYS);
       const monthTasks = await loadTimelineTasks(rangeStart, rangeEnd);
       const monthActivities = await loadActivities(rangeStart, rangeEnd);
-      const focusDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), Math.min(new Date().getDate(), monthEnd.getDate()));
+      const focusDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), Math.min(businessToday().getDate(), monthEnd.getDate()));
       renderPlannerTimeline(rangeStart, rangeEnd, monthTasks, monthActivities, focusDate);
     }
 
@@ -3683,7 +3681,7 @@
     const activityById = new Map((activities || []).map((activity) => [activity.id, activity]));
 
     const renderItem = (item, kind) => {
-      const dayKey = item.day_date || (item.start_at ? toDateInputValue(new Date(item.start_at)) : "");
+      const dayKey = item.day_date || (item.start_at ? TIME.dateKey(item.start_at) : "");
       const dayIndex = dayIndexByKey.get(dayKey);
       if (dayIndex == null) return;
       const duration = Number(item.duration_minutes || 0) || 60;
@@ -3759,7 +3757,7 @@
           if (!scroller) return;
           let target = state.planner.scrollLeft;
           if (!state.planner.hasUserScrolled || target == null) {
-            const today = new Date();
+            const today = businessToday();
             const todayKey = toDateInputValue(today);
             const focusKey = toDateInputValue(focusDate || today);
             let idx = dayIndexByKey.get(todayKey);
@@ -4068,7 +4066,7 @@
             booking.className = "timeline-booking";
             if (task.status === "done") booking.classList.add("is-done");
             if (task.status === "canceled") booking.classList.add("is-cancelled");
-            if (isSameDay(day, new Date())) booking.classList.add("is-focus");
+            if (isSameDay(day, businessToday())) booking.classList.add("is-focus");
 
             const main = document.createElement("div");
             main.className = "timeline-booking__main";
@@ -4159,7 +4157,7 @@
           booking.className = "timeline-booking";
           if (activity.status === "done") booking.classList.add("is-done");
           if (activity.status === "canceled") booking.classList.add("is-cancelled");
-          if (isSameDay(day, new Date())) booking.classList.add("is-focus");
+          if (isSameDay(day, businessToday())) booking.classList.add("is-focus");
           applyActivityColor(booking, getActivityColor(activity));
 
           const main = document.createElement("div");
@@ -4264,7 +4262,7 @@
     if (!els.timelineHeatmap) return;
     const monthStart = startOfMonth(focusDate);
     const monthEnd = endOfMonth(focusDate);
-    const todayKey = toDateInputValue(new Date());
+    const todayKey = TIME.todayKey();
     const startOffset = monthStart.getDay();
     const gridStart = addDays(monthStart, -startOffset);
     const monthTasksByDay = groupBy(monthTasks, (t) => t.day_date);
@@ -4546,8 +4544,7 @@
       if (type.color) payload.color = type.color;
       if (!tbd && els.timelineAddTime) {
         const time = els.timelineAddTime.value || "09:00";
-        const start = new Date(`${toDateInputValue(day)}T${time}:00`);
-        payload.start_at = start.toISOString();
+        payload.start_at = TIME.toIso(toDateInputValue(day), time);
       }
       const { error: activityError } = await CN.sb.from("activities").insert(payload);
       if (activityError) throw activityError;
@@ -4585,11 +4582,9 @@
     }
     if (!tbd && els.timelineAddTime) {
       const time = els.timelineAddTime.value || "09:00";
-      const start = new Date(`${toDateInputValue(day)}T${time}:00`);
-      payload.start_at = start.toISOString();
+      payload.start_at = TIME.toIso(toDateInputValue(day), time);
       if (duration) {
-        const end = new Date(start.getTime() + duration * 60000);
-        payload.end_at = end.toISOString();
+        payload.end_at = TIME.addWallMinutesIso(toDateInputValue(day), time, duration);
       }
     }
     const { data, error } = await CN.sb.from("tasks").insert(payload).select("id, property_id").single();
@@ -4639,7 +4634,7 @@
 
   function wireScheduleControls() {
     if (els.scheduleMonth && !els.scheduleMonth.value) {
-      els.scheduleMonth.value = toMonthInputValue(new Date());
+      els.scheduleMonth.value = TIME.monthKey(new Date());
     }
     if (els.scheduleMonth) {
       els.scheduleMonth.addEventListener("change", () => refreshSchedule().catch((e) => toast(e.message || String(e), "error")));
@@ -4671,7 +4666,7 @@
 
   function wireWorklogControls() {
     if (els.worklogMonth && !els.worklogMonth.value) {
-      els.worklogMonth.value = toMonthInputValue(new Date());
+      els.worklogMonth.value = TIME.monthKey(new Date());
     }
     if (els.worklogMonth) {
       els.worklogMonth.addEventListener("change", () => refreshWorklog().catch((e) => toast(e.message || String(e), "error")));
@@ -4720,7 +4715,7 @@
       const basePrice = Number.isFinite(taskPrice) ? taskPrice : (Number.isFinite(propPrice) ? propPrice : null);
       const addOns = normalizeAddOns(task.add_ons);
       const extraParts = addOns.map((addon) => `${addon.label}: ${formatCurrency(addon.amount)}`);
-      const timestamp = task.completed_at || task.end_at || task.start_at || (task.day_date ? `${task.day_date}T00:00:00` : "");
+      const timestamp = task.completed_at || task.end_at || task.start_at || (task.day_date ? TIME.toIso(task.day_date, "00:00") : "");
       const sortKey = timestamp || task.day_date || "";
       rows.push({
         address: propAddr,
@@ -4735,7 +4730,7 @@
       const propAddr = (activity.property && activity.property.address) || (getPropertyById(activity.property_id) || {}).address || "No property";
       const activityName = activity.type_name_snapshot || "Activity";
       const activityPrice = parseAmount(activity.price);
-      const timestamp = activity.completed_at || activity.start_at || (activity.day_date ? `${activity.day_date}T00:00:00` : "");
+      const timestamp = activity.completed_at || activity.start_at || (activity.day_date ? TIME.toIso(activity.day_date, "00:00") : "");
       const sortKey = timestamp || activity.day_date || "";
       rows.push({
         address: propAddr,
@@ -4816,7 +4811,7 @@
 
   async function refreshWorklog() {
     if (!els.worklogList || !els.worklogMonth) return;
-    const monthDate = fromMonthInputValue(els.worklogMonth.value) || new Date();
+    const monthDate = fromMonthInputValue(els.worklogMonth.value) || businessToday();
     const startDate = startOfMonth(monthDate);
     const endDate = endOfMonth(monthDate);
     const [tasks, activities] = await Promise.all([
@@ -4864,7 +4859,7 @@
 
   function openExpenseForm() {
     if (els.expenseDate && !els.expenseDate.value) {
-      els.expenseDate.value = toDateInputValue(new Date());
+      els.expenseDate.value = TIME.todayKey();
     }
     if (els.expenseProperty) els.expenseProperty.value = "";
     if (els.expenseAmount) els.expenseAmount.value = "";
@@ -4977,7 +4972,7 @@
 
   async function refreshExpenses() {
     if (!els.expensesList || !els.expensesMonth) return;
-    const monthDate = fromMonthInputValue(els.expensesMonth.value) || new Date();
+    const monthDate = fromMonthInputValue(els.expensesMonth.value) || businessToday();
     const startDate = startOfMonth(monthDate);
     const endDate = endOfMonth(monthDate);
     try {
@@ -5071,10 +5066,10 @@
 
   function wireExpensesControls() {
     if (els.expensesMonth && !els.expensesMonth.value) {
-      els.expensesMonth.value = toMonthInputValue(new Date());
+      els.expensesMonth.value = TIME.monthKey(new Date());
     }
     if (els.expenseDate && !els.expenseDate.value) {
-      els.expenseDate.value = toDateInputValue(new Date());
+      els.expenseDate.value = TIME.todayKey();
     }
     if (els.expensesMonth) {
       els.expensesMonth.addEventListener("change", () => {
@@ -5382,7 +5377,7 @@
 
   async function refreshFinanceReport() {
     if (!els.financeMonth) return;
-    const monthDate = fromMonthInputValue(els.financeMonth.value) || new Date();
+    const monthDate = fromMonthInputValue(els.financeMonth.value) || businessToday();
     const startDate = startOfMonth(monthDate);
     const endDate = endOfMonth(monthDate);
     const propertyId = els.financeProperty ? String(els.financeProperty.value || "").trim() : "";
@@ -5457,7 +5452,7 @@
   }
 
   function wireFinanceControls() {
-    const now = new Date();
+    const now = businessToday();
     if (els.financeMonth && !els.financeMonth.value) {
       els.financeMonth.value = toMonthInputValue(now);
     }
@@ -5476,7 +5471,7 @@
     }
     if (els.financeResetFilters) {
       els.financeResetFilters.addEventListener("click", () => {
-        if (els.financeMonth) els.financeMonth.value = toMonthInputValue(new Date());
+        if (els.financeMonth) els.financeMonth.value = TIME.monthKey(new Date());
         if (els.financeProperty) els.financeProperty.value = "";
         refreshFinanceReport().catch((e) => toast(e.message || String(e), "error"));
       });
@@ -5725,7 +5720,7 @@
   }
 
   function clearInvoiceForm() {
-    if (els.invoiceIssueDate) els.invoiceIssueDate.value = toDateInputValue(new Date());
+    if (els.invoiceIssueDate) els.invoiceIssueDate.value = TIME.todayKey();
     if (els.invoiceNumber) els.invoiceNumber.value = "";
     if (els.invoiceProperty) els.invoiceProperty.value = "";
     if (els.invoiceBillingContact) {
@@ -5743,7 +5738,7 @@
 
   function wireInvoiceControls() {
     if (els.invoiceIssueDate && !els.invoiceIssueDate.value) {
-      els.invoiceIssueDate.value = toDateInputValue(new Date());
+      els.invoiceIssueDate.value = TIME.todayKey();
     }
     if (els.invoiceProperty) {
       populateInvoicePropertySelect();
@@ -6229,7 +6224,7 @@
   }
 
   async function createInvoice() {
-    const issueDate = els.invoiceIssueDate ? (els.invoiceIssueDate.value || toDateInputValue(new Date())) : toDateInputValue(new Date());
+    const issueDate = els.invoiceIssueDate ? (els.invoiceIssueDate.value || TIME.todayKey()) : TIME.todayKey();
     const invoiceNumber = els.invoiceNumber ? els.invoiceNumber.value.trim() : "";
     const propertyId = els.invoiceProperty ? (els.invoiceProperty.value || null) : null;
     const customerName = els.invoiceCustomerName ? els.invoiceCustomerName.value.trim() : "";
@@ -6335,7 +6330,7 @@
 
   async function refreshSchedule() {
     if (!els.scheduleList || !els.scheduleMonth) return;
-    const monthDate = fromMonthInputValue(els.scheduleMonth.value) || new Date();
+    const monthDate = fromMonthInputValue(els.scheduleMonth.value) || businessToday();
     const startDate = startOfMonth(monthDate);
     const endDate = endOfMonth(monthDate);
     const tasks = await loadScheduleTasks(startDate, endDate);
@@ -6476,7 +6471,7 @@
 
   function wireActivitiesControls() {
     if (els.activitiesMonth && !els.activitiesMonth.value) {
-      els.activitiesMonth.value = toMonthInputValue(new Date());
+      els.activitiesMonth.value = TIME.monthKey(new Date());
     }
     if (els.activitiesMonth) {
       els.activitiesMonth.addEventListener("change", () => refreshActivities().catch((e) => toast(e.message || String(e), "error")));
@@ -6542,7 +6537,7 @@
   async function refreshActivities() {
     if (!els.activitiesPanel || !els.activitiesMonth) return;
     try {
-      const monthDate = fromMonthInputValue(els.activitiesMonth.value) || new Date();
+      const monthDate = fromMonthInputValue(els.activitiesMonth.value) || businessToday();
       const startDate = startOfMonth(monthDate);
       const endDate = endOfMonth(monthDate);
       const activities = await loadActivities(startDate, endDate);
@@ -6846,7 +6841,7 @@
         }
       }
       if (els.activityDate) {
-        els.activityDate.value = activity.day_date || toDateInputValue(new Date());
+        els.activityDate.value = activity.day_date || TIME.todayKey();
       }
       if (els.activityTimeFrom) {
         els.activityTimeFrom.value = activity.start_at ? toTimeInputValue(activity.start_at) : "09:00";
@@ -6872,7 +6867,7 @@
         els.activityCustomName.value = "";
         els.activityCustomName.style.display = "none";
       }
-      if (els.activityDate) els.activityDate.value = toDateInputValue(new Date());
+      if (els.activityDate) els.activityDate.value = TIME.todayKey();
       if (els.activityTimeFrom) els.activityTimeFrom.value = "09:00";
       if (els.activityDuration) els.activityDuration.value = "30";
       if (els.activityPrice) els.activityPrice.value = "";
@@ -6947,8 +6942,7 @@
         patch.color = null;
       }
       if (time) {
-        const start = new Date(`${day}T${time}:00`);
-        patch.start_at = start.toISOString();
+        patch.start_at = TIME.toIso(day, time);
       } else {
         patch.start_at = null;
       }
@@ -6980,8 +6974,7 @@
       payload.color = color;
     }
     if (time) {
-      const start = new Date(`${day}T${time}:00`);
-      payload.start_at = start.toISOString();
+      payload.start_at = TIME.toIso(day, time);
     }
     const { error } = await CN.sb.from("activities").insert(payload);
     if (error) throw error;
@@ -7252,7 +7245,7 @@
     try {
       setAdminAlert("Preparing export...", "ok");
       const data = await callAdminFunction("admin-export-json", {});
-      const fileName = `backup-${data.tenant_slug || data.tenant_id || "tenant"}-${toDateInputValue(new Date())}.json`;
+      const fileName = `backup-${data.tenant_slug || data.tenant_id || "tenant"}-${TIME.todayKey()}.json`;
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -7262,7 +7255,7 @@
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      if (els.backupHint) els.backupHint.textContent = "Exported " + new Date().toLocaleString();
+      if (els.backupHint) els.backupHint.textContent = "Exported " + TIME.dateTimeKey(new Date());
       setAdminAlert("Export complete.", "ok");
     } catch (e) {
       setAdminAlert(e.message || String(e), "error");
@@ -7381,7 +7374,7 @@
     const firstEnabled = MODULE_DEFS.find((m) => state.modules[m.key] !== false);
     const mobileStartTimeline = isMobileViewport() && state.modules.timeline !== false;
     if (mobileStartTimeline) {
-      const today = new Date();
+      const today = businessToday();
       const monthValue = toMonthInputValue(today);
       state.timeline.month = monthValue;
       if (els.timelineMonth) els.timelineMonth.value = monthValue;
@@ -7399,7 +7392,7 @@
     await refreshFinanceReport().catch(() => {});
     await refreshActivities().catch(() => {});
     if (mobileStartTimeline) {
-      scrollTimelineToDate(toDateInputValue(new Date()));
+      scrollTimelineToDate(TIME.todayKey());
     }
 
     if (baseDataError && els.activitiesPanel) {

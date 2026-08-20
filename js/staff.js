@@ -2,6 +2,7 @@
 
 (async function () {
   const { $, toast } = CN_UI;
+  const TIME = CN.time;
   let profile;
 
   try {
@@ -79,7 +80,7 @@
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return TIME.formatTime(d);
   }
 
   function fmtTimeRange(startAt, endAt, durationMinutes) {
@@ -87,9 +88,7 @@
     const startLabel = fmtTime(startAt);
     if (endAt) return `${startLabel} - ${fmtTime(endAt)}`;
     if (durationMinutes) {
-      const d = new Date(startAt);
-      d.setMinutes(d.getMinutes() + Number(durationMinutes || 0));
-      return `${startLabel} - ${fmtTime(d.toISOString())}`;
+      return `${startLabel} - ${fmtTime(TIME.addWallMinutesFromInstantIso(startAt, durationMinutes))}`;
     }
     return startLabel;
   }
@@ -239,7 +238,7 @@
 
     ctx.drawImage(img, 0, 0, width, height);
 
-    const stamp = new Date().toISOString().replace("T", " ").slice(0, 16);
+    const stamp = TIME.dateTimeKey(new Date());
     const text = `WORK ${stamp}`;
     const fontSize = Math.max(14, Math.round(Math.min(width, height) / 24));
     const padX = Math.round(fontSize * 0.8);
@@ -380,7 +379,7 @@
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("en-US", {
+    return TIME.formatDate(d, "en-US", {
       year: "numeric",
       month: "short",
       day: "numeric"
@@ -971,7 +970,7 @@
   }
 
   async function refresh() {
-    const startDate = new Date();
+    const startDate = TIME.calendarDate(new Date());
     const endDate = addDays(startDate, state.rangeDays - 1);
     try {
       const [tasks, activities] = await Promise.all([

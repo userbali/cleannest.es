@@ -2,6 +2,7 @@
 
 (async function () {
   const { $, toast } = CN_UI;
+  const TIME = CN.time;
   let profile;
 
   try {
@@ -35,19 +36,15 @@
     : "";
   let targetTaskRevealed = false;
 
-  function pad2(n) {
-    return String(n).padStart(2, "0");
-  }
-
   function toDateInputValue(date) {
-    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+    return TIME.dateKey(date);
   }
 
   function fmtTime(ts) {
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return TIME.formatTime(d);
   }
 
   function fmtTimeRange(startAt, endAt, durationMinutes) {
@@ -55,9 +52,7 @@
     const startLabel = fmtTime(startAt);
     if (endAt) return `${startLabel} - ${fmtTime(endAt)}`;
     if (durationMinutes) {
-      const d = new Date(startAt);
-      d.setMinutes(d.getMinutes() + Number(durationMinutes || 0));
-      return `${startLabel} - ${fmtTime(d.toISOString())}`;
+      return `${startLabel} - ${fmtTime(TIME.addWallMinutesFromInstantIso(startAt, durationMinutes))}`;
     }
     return startLabel;
   }
@@ -74,8 +69,7 @@
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-    return `${toDateInputValue(d)} ${time}`;
+    return TIME.dateTimeKey(d);
   }
 
   const SETUP_LABEL_PREFIX = "SETUP::";
@@ -123,7 +117,7 @@
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("en-US", {
+    return TIME.formatDate(d, "en-US", {
       year: "numeric",
       month: "short",
       day: "numeric"
@@ -300,7 +294,7 @@
   }
 
   async function loadUpcoming() {
-    const today = toDateInputValue(new Date());
+    const today = TIME.todayKey();
     const { data, error } = await CN.sb
       .from("tasks")
       .select("id, property_id, day_date, status, duration_minutes, start_at, end_at, notes, checklist_note, property:properties(id, address), label:task_labels(name)")

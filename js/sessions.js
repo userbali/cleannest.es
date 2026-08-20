@@ -2,6 +2,7 @@
 
 (async function () {
   const { $, toast } = CN_UI;
+  const TIME = CN.time;
   const roleTag = $("roleTag");
   const userTag = $("userTag");
   const subLine = $("subLine");
@@ -13,22 +14,18 @@
     return new URLSearchParams(window.location.search).get(name) || "";
   }
 
-  function pad2(n) {
-    return String(n).padStart(2, "0");
-  }
-
   function fmtDate(ts) {
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    return TIME.dateKey(d);
   }
 
   function fmtTime(ts) {
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return TIME.formatTime(d);
   }
 
   function fmtTimeRange(startAt, endAt, durationMinutes) {
@@ -36,9 +33,7 @@
     const startLabel = fmtTime(startAt);
     if (endAt) return `${startLabel} - ${fmtTime(endAt)}`;
     if (durationMinutes) {
-      const d = new Date(startAt);
-      d.setMinutes(d.getMinutes() + Number(durationMinutes || 0));
-      return `${startLabel} - ${fmtTime(d.toISOString())}`;
+      return `${startLabel} - ${fmtTime(TIME.addWallMinutesFromInstantIso(startAt, durationMinutes))}`;
     }
     return startLabel;
   }
@@ -79,7 +74,7 @@
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("en-US", {
+    return TIME.formatDate(d, "en-US", {
       year: "numeric",
       month: "short",
       day: "numeric"
