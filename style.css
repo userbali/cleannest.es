@@ -2399,6 +2399,22 @@ html[data-theme="canary"] body:not(.portal-page) footer{
 }
 .timeline-booking.is-cancelled{ opacity: .55; text-decoration: line-through; }
 
+.timeline-booking.has-notes{
+  border-color: var(--danger-border);
+  box-shadow: inset 4px 0 0 #e53935;
+}
+.timeline-booking__note{
+  display:inline-block;
+  max-width: 100%;
+  padding: 2px 7px;
+  border: 1px solid var(--danger-border);
+  border-radius: 999px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-weight: 900;
+  white-space: pre-wrap;
+}
+
 .timeline-booking + .timeline-booking{ margin-top: 10px; }
 
 .timeline-booking__main{ min-width: 0; display:flex; flex-direction:column; gap:2px; }
@@ -2620,6 +2636,12 @@ html[data-theme="canary"] body:not(.portal-page) footer{
 .hz-item.has-activity-color{
   background: color-mix(in srgb, var(--activity-color) 18%, var(--surface2));
   border-color: color-mix(in srgb, var(--activity-color) 40%, var(--stroke));
+}
+.hz-item.has-notes{
+  color: var(--danger-text);
+  background: color-mix(in srgb, var(--danger-bg) 75%, var(--surface2));
+  border-color: var(--danger-border);
+  box-shadow: inset 4px 0 0 #e53935, 0 8px 18px rgba(11,27,43,.10);
 }
 .hz-selection{
   position: absolute;

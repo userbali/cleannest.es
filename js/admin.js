@@ -394,6 +394,27 @@
     el.style.setProperty("--activity-color", normalized);
   }
 
+  function timelineNoteText(value) {
+    return String(value || "").trim();
+  }
+
+  function appendTimelineMetaPart(container, value, className = "") {
+    if (!container) return;
+    const text = String(value || "").trim();
+    if (!text) return;
+    if (container.childNodes.length) {
+      container.appendChild(document.createTextNode(" | "));
+    }
+    if (!className) {
+      container.appendChild(document.createTextNode(text));
+      return;
+    }
+    const part = document.createElement("span");
+    part.className = className;
+    part.textContent = text;
+    container.appendChild(part);
+  }
+
   function formatDurationLabel(minutes) {
     const total = Math.max(0, Math.round(Number(minutes) || 0));
     const days = Math.floor(total / (24 * 60));
@@ -3706,6 +3727,8 @@
       if (item.status === "done") pill.classList.add("is-done");
       if (item.status === "canceled") pill.classList.add("is-cancelled");
       if (isTbd) pill.classList.add("is-tbd");
+      const itemNotes = timelineNoteText(item.notes);
+      if (itemNotes) pill.classList.add("has-notes");
 
       if (kind === "activity") {
         applyActivityColor(pill, getActivityColor(item));
@@ -3715,7 +3738,7 @@
         ? (item.type_name_snapshot || "Activity")
         : (getLabelById(item.label_id) || {}).name || "Task";
       pill.textContent = `${fmtTimeRange(item.start_at, item.end_at, item.duration_minutes)} â€¢ ${label}`;
-      pill.title = pill.textContent;
+      pill.title = itemNotes ? `${pill.textContent}\nNotes: ${itemNotes}` : pill.textContent;
 
       pill.dataset.kind = kind;
       pill.dataset.id = item.id;
@@ -4067,6 +4090,8 @@
             if (task.status === "done") booking.classList.add("is-done");
             if (task.status === "canceled") booking.classList.add("is-cancelled");
             if (isSameDay(day, businessToday())) booking.classList.add("is-focus");
+            const taskNotes = timelineNoteText(task.notes);
+            if (taskNotes) booking.classList.add("has-notes");
 
             const main = document.createElement("div");
             main.className = "timeline-booking__main";
@@ -4102,13 +4127,13 @@
             meta.className = "timeline-booking__meta";
             const label = getLabelById(task.label_id);
             const staffName = task.assigned_user_id ? getStaffName(task.assigned_user_id) : "Unassigned";
-            const metaParts = [label ? label.name : "Task", staffName];
-            if (task.notes) metaParts.push(task.notes);
+            appendTimelineMetaPart(meta, label ? label.name : "Task");
+            appendTimelineMetaPart(meta, staffName);
+            appendTimelineMetaPart(meta, taskNotes, "timeline-booking__note");
             if (task.status === "done") {
               const completed = fmtDateTime(task.completed_at);
-              if (completed) metaParts.push(`Completed: ${completed}`);
+              if (completed) appendTimelineMetaPart(meta, `Completed: ${completed}`);
             }
-            meta.textContent = metaParts.filter(Boolean).join(" | ");
             main.appendChild(timeRow);
             main.appendChild(addr);
             main.appendChild(meta);
@@ -4158,6 +4183,8 @@
           if (activity.status === "done") booking.classList.add("is-done");
           if (activity.status === "canceled") booking.classList.add("is-cancelled");
           if (isSameDay(day, businessToday())) booking.classList.add("is-focus");
+          const activityNotes = timelineNoteText(activity.notes);
+          if (activityNotes) booking.classList.add("has-notes");
           applyActivityColor(booking, getActivityColor(activity));
 
           const main = document.createElement("div");
@@ -4176,11 +4203,9 @@
         const meta = document.createElement("div");
         meta.className = "timeline-booking__meta";
         const staffName = activity.assigned_user_id ? getStaffName(activity.assigned_user_id) : "Unassigned";
-        const metaParts = [];
-        if (prop) metaParts.push(typeName);
-        metaParts.push(staffName);
-        if (activity.notes) metaParts.push(activity.notes);
-        meta.textContent = metaParts.filter(Boolean).join(" | ");
+        if (prop) appendTimelineMetaPart(meta, typeName);
+        appendTimelineMetaPart(meta, staffName);
+        appendTimelineMetaPart(meta, activityNotes, "timeline-booking__note");
           main.appendChild(timeRow);
           main.appendChild(addr);
           main.appendChild(meta);
