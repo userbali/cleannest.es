@@ -2730,13 +2730,30 @@
       phoneInput.value = owner ? owner.phone || "" : "";
       phoneWrap.appendChild(phoneLabel);
       phoneWrap.appendChild(phoneInput);
+      const emailWrap = document.createElement("div");
+      const emailLabel = document.createElement("div");
+      emailLabel.className = "label";
+      emailLabel.textContent = "Client email / login email";
+      const emailInput = document.createElement("input");
+      emailInput.className = "input";
+      emailInput.type = "email";
+      emailInput.inputMode = "email";
+      emailInput.autocomplete = "off";
+      emailInput.placeholder = "Client email / login email";
+      emailInput.value = owner ? owner.email || "" : "";
+      const emailHint = document.createElement("div");
+      emailHint.className = "small-note";
+      emailHint.textContent = "Changes the client's login email for all their properties.";
+      emailWrap.appendChild(emailLabel);
+      emailWrap.appendChild(emailInput);
+      emailWrap.appendChild(emailHint);
       editForm.appendChild(cityWrap);
       editForm.appendChild(addrWrap);
       const phoneRow = document.createElement("div");
       phoneRow.className = "row-2";
       phoneRow.style.marginTop = "8px";
+      phoneRow.appendChild(emailWrap);
       phoneRow.appendChild(phoneWrap);
-      phoneRow.appendChild(document.createElement("div"));
       const editActions = document.createElement("div");
       editActions.className = "row";
       editActions.style.justifyContent = "flex-end";
@@ -2761,6 +2778,7 @@
         if (!editPanel.hidden) {
           cityInput.value = property.city || "";
           addrInput.value = property.address || "";
+          emailInput.value = owner ? owner.email || "" : "";
           phoneInput.value = owner ? owner.phone || "" : "";
         }
       });
@@ -2770,6 +2788,7 @@
         editSave.addEventListener("click", async () => {
         const nextCity = cityInput.value.trim();
         const nextAddress = addrInput.value.trim();
+        const nextEmail = emailInput.value.trim().toLowerCase();
         const nextPhone = phoneInput.value.trim() || null;
         if (!nextCity) {
           toast("City is required.", "error");
@@ -2779,16 +2798,41 @@
           toast("Address is required.", "error");
           return;
         }
+        if (!nextEmail || !emailInput.checkValidity()) {
+          toast("Enter a valid client email.", "error");
+          emailInput.focus();
+          return;
+        }
+        const ownerId = property.owner_user_id || (owner ? owner.id : "");
+        if (!ownerId) {
+          toast("Client account not found.", "error");
+          return;
+        }
+        const previousEmail = owner ? String(owner.email || "").trim().toLowerCase() : "";
+        const emailChanged = nextEmail !== previousEmail;
+        if (emailChanged) {
+          const fallback = "This changes the client's login email for all properties assigned to this client. Continue?";
+          const message = window.CN_ADMIN_I18N
+            ? window.CN_ADMIN_I18N.t("properties.confirm_change_client_email", fallback)
+            : fallback;
+          if (!window.confirm(message)) return;
+        }
+        editSave.disabled = true;
+        const saveLabel = editSave.textContent;
+        editSave.textContent = "Saving...";
         try {
-          const ownerId = property.owner_user_id || (owner ? owner.id : "");
-          if (ownerId) {
-            const { error: ownerError } = await CN.sb
-              .from("profiles")
-              .update({ phone: nextPhone })
-              .eq("id", ownerId)
-              .eq("tenant_id", tenantId);
-            if (ownerError) throw ownerError;
+          if (emailChanged) {
+            await callAdminFunction("admin-update-client-email", {
+              user_id: ownerId,
+              email: nextEmail
+            });
           }
+          const { error: ownerError } = await CN.sb
+            .from("profiles")
+            .update({ phone: nextPhone })
+            .eq("id", ownerId)
+            .eq("tenant_id", tenantId);
+          if (ownerError) throw ownerError;
           const { error } = await CN.sb
             .from("properties")
             .update({ city: nextCity, address: nextAddress })
@@ -2801,19 +2845,31 @@
           }
           property.city = nextCity;
           property.address = nextAddress;
-          if (owner) owner.phone = nextPhone || "";
-          if (row && row.owner) row.owner.phone = nextPhone || "";
+          if (owner) {
+            owner.email = nextEmail;
+            owner.phone = nextPhone || "";
+          }
+          if (row && row.owner) {
+            row.owner.email = nextEmail;
+            row.owner.phone = nextPhone || "";
+          }
           const clientRow = state.clients.find((c) => c.id === ownerId);
-          if (clientRow) clientRow.phone = nextPhone || "";
+          if (clientRow) {
+            clientRow.email = nextEmail;
+            clientRow.phone = nextPhone || "";
+          }
           toast("Property updated.", "ok");
           editPanel.hidden = true;
           renderClientsList();
           await renderPropertyDetail(property);
         } catch (e) {
           toast(e.message || String(e), "error");
+        } finally {
+          editSave.disabled = false;
+          editSave.textContent = saveLabel;
         }
       });
-        [cityInput, addrInput, phoneInput].forEach((input) => {
+        [cityInput, addrInput, emailInput, phoneInput].forEach((input) => {
           input.addEventListener("keydown", (ev) => {
             if (ev.key === "Enter") editSave.click();
             if (ev.key === "Escape") editCancel.click();
