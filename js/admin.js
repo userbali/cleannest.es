@@ -34,6 +34,7 @@
     activityTypes: [],
     modules: {},
     invoices: [],
+    invoiceSort: "date_desc",
     selectedInvoiceId: null,
     invoiceIssuerText: "",
     selectedPropertyId: null,
@@ -268,6 +269,7 @@
     invoiceAddItemBtn: $("invoiceAddItemBtn"),
     invoiceSaveBtn: $("invoiceSaveBtn"),
     invoiceClearBtn: $("invoiceClearBtn"),
+    invoiceSort: $("invoiceSort"),
     invoiceList: $("invoiceList"),
     invoicePreview: $("invoicePreview"),
     invoicePrintArea: $("invoicePrintArea"),
@@ -5883,6 +5885,13 @@
         if (serviceInput) serviceInput.focus();
       });
     }
+    if (els.invoiceSort) {
+      els.invoiceSort.value = state.invoiceSort;
+      els.invoiceSort.addEventListener("change", () => {
+        state.invoiceSort = els.invoiceSort.value || "date_desc";
+        renderInvoiceList();
+      });
+    }
     if (els.invoiceSettingsBtn) {
       els.invoiceSettingsBtn.addEventListener("click", openInvoiceSettingsModal);
     }
@@ -6196,6 +6205,27 @@
     window.print();
   }
 
+  const invoiceNumberCollator = new Intl.Collator(undefined, {
+    numeric: true,
+    sensitivity: "base"
+  });
+
+  function getSortedInvoices() {
+    const invoices = state.invoices.slice();
+    if (state.invoiceSort === "date_desc") return invoices;
+    const direction = state.invoiceSort === "number_desc" ? -1 : 1;
+    return invoices.sort((a, b) => {
+      const aNumber = String(a.invoice_number || "").trim();
+      const bNumber = String(b.invoice_number || "").trim();
+      if (!aNumber && !bNumber) return 0;
+      if (!aNumber) return 1;
+      if (!bNumber) return -1;
+      const result = invoiceNumberCollator.compare(aNumber, bNumber);
+      if (result !== 0) return result * direction;
+      return String(b.issue_date || "").localeCompare(String(a.issue_date || ""));
+    });
+  }
+
   function renderInvoiceList() {
     if (!els.invoiceList) return;
     els.invoiceList.innerHTML = "";
@@ -6203,7 +6233,7 @@
       els.invoiceList.innerHTML = '<div class="empty-state"><div class="empty-state__msg">No invoices yet.</div></div>';
       return;
     }
-    state.invoices.forEach((invoice) => {
+    getSortedInvoices().forEach((invoice) => {
       const row = document.createElement("div");
       row.className = "invoice-list-row";
       if (state.selectedInvoiceId === invoice.id) row.classList.add("is-active");
@@ -6246,8 +6276,9 @@
       if (state.selectedInvoiceId) {
         const invoice = state.invoices.find((inv) => inv.id === state.selectedInvoiceId);
         renderInvoicePreview(invoice || null);
-      } else if (state.invoices[0]) {
-        selectInvoice(state.invoices[0].id);
+      } else {
+        const firstInvoice = getSortedInvoices()[0];
+        if (firstInvoice) selectInvoice(firstInvoice.id);
       }
     } catch (e) {
       if (els.invoiceList) {

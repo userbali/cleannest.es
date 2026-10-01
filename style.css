@@ -2104,6 +2104,34 @@ html[data-theme="canary"] body:not(.portal-page) footer{
   gap:8px;
 }
 
+.invoice-list-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+  font-weight:800;
+}
+
+.invoice-sort{
+  width:auto;
+  min-width:220px;
+  max-width:280px;
+}
+
+@media (max-width: 640px){
+  .invoice-list-head{
+    align-items:stretch;
+    flex-direction:column;
+  }
+
+  .invoice-sort{
+    width:100%;
+    min-width:0;
+    max-width:none;
+  }
+}
+
 .invoice-list-row{
   display:flex;
   align-items:center;
